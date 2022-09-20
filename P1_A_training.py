@@ -1,3 +1,4 @@
+import argparse
 import os
 
 import matplotlib.pyplot as plt
@@ -10,8 +11,8 @@ from sklearn.metrics import accuracy_score
 from torch import nn
 from torch.utils.data import DataLoader
 
+import P1_models
 from P1_dataloader import p1_dataset
-from P1_models import ALL_Conv
 
 # load data
 mean = [0.49156518, 0.48238982, 0.4469944]  # calculated on cifar10
@@ -42,15 +43,20 @@ train_loader = DataLoader(
 valid_loader = DataLoader(
     dataset=valid_dataset, batch_size=256, shuffle=False, num_workers=4)
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '-m', '--model', help='model', type=str)
+args = parser.parse_args()
 
 device = torch.device('cuda')
-epochs = 601
-plot_epochs = {1, 201, 401, 601}
+epochs = 1000
+plot_epochs = {100 * i for i in range(1, 11)} | {1}
 best_acc = 0.0
-ckpt_path = './p1_A_checkpoint'
+ckpt_path = f'./p1_A_checkpoint_{args.model}'
 
 # model
-net = ALL_Conv(in_channel=3, out_size=50).to(device)
+net = getattr(P1_models, args.model)()
+net = net.to(device)
 net.train()
 loss_fn = nn.CrossEntropyLoss()
 optim = torch.optim.AdamW(net.parameters(), lr=0.001)
@@ -93,7 +99,7 @@ for epoch in range(1, epochs + 1):
             all_y = None
             for x, y in valid_loader:
                 x, y = x.to(device), y.to(device)
-                out = net.net(x)  # calling the second last layer
+                out = net.get_embedding(x)  # calling the second last layer
                 if all_x is None:
                     all_x = out.detach().cpu().numpy()
                     all_y = y.detach().cpu().numpy().flatten()
@@ -110,7 +116,7 @@ for epoch in range(1, epochs + 1):
         plt.figure()
         plt.title(f"PCA figure for epoch {epoch}")
         plt.scatter(d_x[:, 0], d_x[:, 1], c=all_y)
-        plt.savefig(f"./P1_plots/PCA_{epoch}")
+        plt.savefig(f"./P1_plots/{args.model}_PCA_{epoch}")
 
         # plot t-SNE
         tsne = TSNE(n_components=2)
@@ -118,7 +124,7 @@ for epoch in range(1, epochs + 1):
         plt.figure()
         plt.title(f"t-SNE figure for epoch {epoch}")
         plt.scatter(d_x[:, 0], d_x[:, 1], c=all_y)
-        plt.savefig(f"./P1_plots/TSNE_{epoch}")
+        plt.savefig(f"./P1_plots/{args.model}_TSNE_{epoch}")
 
     print(f"epoch {epoch}, va_acc = {va_acc}, va_loss = {va_loss}")
     if va_acc > best_acc:
@@ -127,3 +133,5 @@ for epoch in range(1, epochs + 1):
             ckpt_path, 'best_optimizer.pth'))
         torch.save(net.state_dict(), os.path.join(ckpt_path, 'best_model.pth'))
         print("new model saved  sucessfully!")
+
+print(f"best validation acc: {best_acc}")
