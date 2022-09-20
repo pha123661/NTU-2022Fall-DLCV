@@ -1,5 +1,6 @@
 import os
 
+import torch
 from PIL import Image
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
@@ -31,6 +32,7 @@ class p1_dataset(Dataset):
 
 
 if __name__ == "__main__":
+    # calculates mean and std of training set
     train_transform = transforms.Compose([
         # transforms.Resize((32, 32)),
         # transforms.RandomCrop((28, 28)),
@@ -42,3 +44,12 @@ if __name__ == "__main__":
 
     dst = p1_dataset(
         "/shared_home/r11944004/pepper_local_disk/DLCV/hw1-pha123661/hw1_data/hw1_data/p1_data/train_50", train_transform)
+    mean = torch.zeros(3)
+    std = torch.zeros(3)
+    for x, _ in dst:
+        mean += x.mean(dim=(1, 2))
+        std += x.std(dim=(1, 2))
+    mean /= len(dst)
+    std /= len(dst)
+    print(mean, std)
+    # [0.5077, 0.4813, 0.4312], [0.2000, 0.1986, 0.2034]

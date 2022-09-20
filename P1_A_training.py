@@ -15,8 +15,8 @@ import P1_models
 from P1_dataloader import p1_dataset
 
 # load data
-mean = [0.49156518, 0.48238982, 0.4469944]  # calculated on cifar10
-std = [0.24687816, 0.24333645, 0.26169549]
+mean = [0.5077, 0.4813, 0.4312]  # calculated at dataloader.py
+std = [0.2000, 0.1986, 0.2034]
 train_dataset = p1_dataset(
     '/shared_home/r11944004/pepper_local_disk/DLCV/hw1-pha123661/hw1_data/hw1_data/p1_data/train_50',
     trns.Compose([
