@@ -12,10 +12,11 @@ from timm.loss import SoftTargetCrossEntropy
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from torchvision import transforms
 
 from P1_dataloader import p1_dataset
 
-model = 'resnetv2_101x1_bitm'
+model = 'beit_base_patch16_224_in22k'
 device = torch.device('cuda')
 epochs = 1000
 plot_epochs = {100 * i for i in range(1, 11)} | {1}
@@ -30,7 +31,7 @@ net = timm.create_model(model, pretrained=True, num_classes=50)
 net = net.to(device)
 net.train()
 loss_fn = SoftTargetCrossEntropy()
-optim = torch.optim.AdamW(net.parameters(), lr=0.001)
+optim = torch.optim.SGD(net.parameters(), lr=0.003)
 mixup = Mixup(
     mixup_alpha=0.1,
     cutmix_alpha=1,
@@ -44,24 +45,44 @@ mixup = Mixup(
 
 if not os.path.isdir(ckpt_path):
     os.mkdir(ckpt_path)
+mean, std = [0.5077, 0.4813, 0.4312], [0.2000, 0.1986, 0.2034]
+# transformations
+transform_train = transforms.Compose([
+    # Transform to PIL Image
+    # Resize image resolution = 160x160
+    # See section A 'Tuning hyperparameters for transfer' of paper for more details
+    # link: https://arxiv.org/pdf/1912.11370v3.pdf
+    transforms.Resize((256, 256)),
+    # data augmentations
+    transforms.RandomCrop((224, 224)),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    # normalization
+    transforms.Normalize(mean, std),
+])
 
-config = resolve_data_config({}, model=model)
-transform = create_transform(**config)
+transform_valid = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    # normalization
+    transforms.Normalize(mean, std),
+])
+
 train_dataset = p1_dataset(
-    '/shared_home/r11944004/pepper_local_disk/DLCV/hw1-pha123661/hw1_data/hw1_data/p1_data/train_50',
-    transform
+    'hw1_data/hw1_data/p1_data/train_50',
+    transform_train
 )
 
 valid_dataset = p1_dataset(
-    '/shared_home/r11944004/pepper_local_disk/DLCV/hw1-pha123661/hw1_data/hw1_data/p1_data/val_50',
-    transform
+    'hw1_data/hw1_data/p1_data/val_50',
+    transform_valid
 )
 
 
 train_loader = DataLoader(
-    dataset=train_dataset, batch_size=64, shuffle=True, num_workers=4, pin_memory=True)
+    dataset=train_dataset, batch_size=32, shuffle=True, num_workers=4, pin_memory=True)
 valid_loader = DataLoader(
-    dataset=valid_dataset, batch_size=64, shuffle=False, num_workers=4, pin_memory=True)
+    dataset=valid_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
 
 # train
 for epoch in range(1, epochs + 1):
