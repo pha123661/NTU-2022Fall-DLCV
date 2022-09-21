@@ -44,7 +44,7 @@ device = torch.device('cuda') if torch.cuda.is_available() else 'cpu'
 # prepare model
 net = timm.create_model('beit_base_patch16_224_in22k',
                         pretrained=False, num_classes=50)
-net.load_state_dict(torch.load('p1_B_checkpoint/best_model.pth'))
+net.load_state_dict(torch.load('P1_B_checkpoint/best_model.pth'))
 net = net.to(device)
 net.eval()
 
