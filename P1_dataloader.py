@@ -43,7 +43,7 @@ if __name__ == "__main__":
     ])
 
     dst = p1_dataset(
-        "/shared_home/r11944004/pepper_local_disk/DLCV/hw1-pha123661/hw1_data/hw1_data/p1_data/train_50", train_transform)
+        "hw1_data/hw1_data/p1_data/train_50", train_transform)
     mean = torch.zeros(3)
     std = torch.zeros(3)
     for x, _ in dst:
