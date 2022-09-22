@@ -48,10 +48,6 @@ if not os.path.isdir(ckpt_path):
 mean, std = [0.5077, 0.4813, 0.4312], [0.2000, 0.1986, 0.2034]
 # transformations
 transform_train = transforms.Compose([
-    # Transform to PIL Image
-    # Resize image resolution = 160x160
-    # See section A 'Tuning hyperparameters for transfer' of paper for more details
-    # link: https://arxiv.org/pdf/1912.11370v3.pdf
     transforms.Resize((256, 256)),
     # data augmentations
     transforms.RandomCrop((224, 224)),

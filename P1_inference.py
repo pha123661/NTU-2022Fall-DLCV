@@ -66,7 +66,10 @@ s_idx = np.argsort(filenames)
 filenames = filenames[s_idx]
 preds = preds[s_idx]
 
-os.makedirs(os.path.dirname(out_csv), exist_ok=True)
+try:
+    os.makedirs(os.path.dirname(out_csv), exist_ok=True)
+except:
+    pass
 
 with open(out_csv, 'w', newline='') as file:
     writer = csv.writer(file)

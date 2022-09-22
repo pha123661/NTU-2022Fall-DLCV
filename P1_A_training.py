@@ -49,8 +49,8 @@ parser.add_argument(
 args = parser.parse_args()
 
 device = torch.device('cuda')
-epochs = 1000
-plot_epochs = {100 * i for i in range(1, 11)} | {1}
+epochs = 300
+plot_epochs = {100 * i for i in range(1, 4)} | {1}
 best_acc = 0.0
 ckpt_path = f'./p1_A_checkpoint_{args.model}'
 
