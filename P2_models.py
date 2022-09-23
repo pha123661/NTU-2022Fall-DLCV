@@ -12,17 +12,27 @@ class my_FCN32s(nn.Module):
         # replace fc by conv
         # fc6
         self.fc6 = nn.Sequential(
-            nn.Conv2d(512, 2048, 7),
+            nn.Conv2d(512, 4096, 7),
             nn.ReLU(inplace=True),
             nn.Dropout2d(),
         )
 
+        self.fc6[0].weight.data = vgg16(weights=VGG16_Weights.DEFAULT).classifier[0].weight.data.view(
+            self.fc6[0].weight.size())
+        self.fc6[0].bias.data = vgg16(
+            weights=VGG16_Weights.DEFAULT).classifier[0].bias.data.view(self.fc6[0].bias.size())
+
         # fc7
         self.fc7 = nn.Sequential(
-            nn.Conv2d(2048, 4096, 1),
+            nn.Conv2d(4096, 4096, 1),
             nn.ReLU(inplace=True),
             nn.Dropout2d(),
         )
+
+        self.fc7[0].weight.data = vgg16(weights=VGG16_Weights.DEFAULT).classifier[3].weight.data.view(
+            self.fc7[0].weight.size())
+        self.fc7[0].bias.data = vgg16(
+            weights=VGG16_Weights.DEFAULT).classifier[3].bias.data.view(self.fc7[0].bias.size())
 
         self.score_fr = nn.Conv2d(4096, n_class, 1)
         self.upscore = nn.ConvTranspose2d(

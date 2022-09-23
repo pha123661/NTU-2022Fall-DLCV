@@ -11,22 +11,6 @@ from torchvision.models import VGG16_Weights, vgg16
 from P2_dataloader import p2_dataset
 from P2_models import FCN32s
 
-
-def mean_iou_score(pred, labels):
-    '''
-    Compute mean IoU score over 6 classes
-    '''
-    mean_iou = 0
-    for i in range(6):
-        tp_fp = np.sum(pred == i)
-        tp_fn = np.sum(labels == i)
-        tp = np.sum((pred == i) * (labels == i))
-        iou = tp / (tp_fp + tp_fn - tp)
-        mean_iou += iou / 6
-
-    return mean_iou
-
-
 # load data
 mean = [0.4085, 0.3785, 0.2809]  # calculated on training set at dataloader.py
 std = [0.1155, 0.0895, 0.0772]
@@ -74,7 +58,7 @@ for p in net.features.parameters():
     p.requires_grad = False
 net.train()
 loss_fn = nn.CrossEntropyLoss()
-optim = torch.optim.SGD(net.parameters(), lr=0.003)
+optim = torch.optim.SGD(net.parameters(), lr=0.03)
 
 if not os.path.isdir(ckpt_path):
     os.mkdir(ckpt_path)
@@ -92,7 +76,7 @@ for epoch in range(1, epochs + 1):
     net.eval()
     with torch.no_grad():
         va_loss = 0
-        mIOU = 0.0
+        mIOUs = []
         for x, y in valid_loader:
             x, y = x.to(device), y.to(device)
             out = net(x)
@@ -102,11 +86,11 @@ for epoch in range(1, epochs + 1):
             pred = pred.detach().cpu().numpy().astype(np.int64)
             y = y.detach().cpu().numpy().astype(np.int64)
             for p, gt in zip(pred, y):
-                mIOU += jaccard_score(p.flatten(),
-                                      gt.flatten(), average='macro')
+                mIOUs.append(jaccard_score(
+                    p.flatten(), gt.flatten(), average='macro'))
 
         va_loss /= len(valid_loader)
-        mIOU /= len(valid_loader)
+        mIOU = sum(mIOUs) / len(mIOUs)
     net.train()
 
     print(f"epoch {epoch}, mIOU = {mIOU}, va_loss = {va_loss}")
