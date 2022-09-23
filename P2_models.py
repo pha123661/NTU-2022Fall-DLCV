@@ -12,14 +12,14 @@ class my_FCN32s(nn.Module):
         # replace fc by conv
         # fc6
         self.fc6 = nn.Sequential(
-            nn.Conv2d(512, 4096, 7),
+            nn.Conv2d(512, 2048, 7),
             nn.ReLU(inplace=True),
             nn.Dropout2d(),
         )
 
         # fc7
         self.fc7 = nn.Sequential(
-            nn.Conv2d(4096, 4096, 1),
+            nn.Conv2d(2048, 4096, 1),
             nn.ReLU(inplace=True),
             nn.Dropout2d(),
         )
