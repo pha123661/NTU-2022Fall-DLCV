@@ -3,6 +3,7 @@ import os
 import numpy as np
 import torch
 import torchvision.transforms as trns
+from sklearn.metrics import jaccard_score
 from torch import nn
 from torch.utils.data import DataLoader, random_split
 from torchvision.models import VGG16_Weights, vgg16
@@ -32,7 +33,10 @@ std = [0.1155, 0.0895, 0.0772]
 
 labeled_dataset = p2_dataset(
     'hw1_data/hw1_data/p2_data/train',
-    transform=trns.ToTensor(),
+    transform=trns.Compose([
+        trns.ToTensor(),
+        trns.Normalize(mean=mean, std=std),
+    ]),
     train=True,
 )
 
@@ -41,7 +45,10 @@ train_dataset, valid_dataset = random_split(
 
 test_dataset = p2_dataset(
     'hw1_data/hw1_data/p2_data/validation',
-    trns.ToTensor(),
+    transform=trns.Compose([
+        trns.ToTensor(),
+        trns.Normalize(mean=mean, std=std),
+    ]),
     train=True,
 )
 
@@ -62,6 +69,9 @@ ckpt_path = f'./P2_A_checkpoint'
 # model
 net = FCN32s()
 net = net.to(device)
+# freeze pretrained VGG
+for p in net.features.parameters():
+    p.requires_grad = False
 net.train()
 loss_fn = nn.CrossEntropyLoss()
 optim = torch.optim.SGD(net.parameters(), lr=0.003)
@@ -89,11 +99,14 @@ for epoch in range(1, epochs + 1):
             pred = out.argmax(dim=1)
             va_loss += nn.functional.cross_entropy(out, y).item()
 
-            if epoch % 10 == 0:
-                mIOU += mean_iou_score(pred.detach().cpu().numpy(),
-                                       y.detach().cpu().numpy())
+            pred = pred.detach().cpu().numpy().astype(np.int64)
+            y = y.detach().cpu().numpy().astype(np.int64)
+            for p, gt in zip(pred, y):
+                mIOU += jaccard_score(p.flatten(),
+                                      gt.flatten(), average='macro')
 
-        va_loss = va_loss / len(valid_loader)
+        va_loss /= len(valid_loader)
+        mIOU /= len(valid_loader)
     net.train()
 
     print(f"epoch {epoch}, mIOU = {mIOU}, va_loss = {va_loss}")
