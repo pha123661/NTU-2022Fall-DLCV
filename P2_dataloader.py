@@ -2,12 +2,15 @@ import glob
 import os
 
 import numpy as np
-from PIL import Image
-from torch.utils.data import Dataset
+from PIL import Image, ImageFile
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True  # some images are truncated
 
 
 class p2_dataset(Dataset):
-    def __init__(self, folder_path, transform, train=False):
+    def __init__(self, folder_path, transform=transforms.ToTensor(), train=False):
 
         self.Train = train
         self.Transformation = transform
@@ -19,7 +22,7 @@ class p2_dataset(Dataset):
 
         if self.Train:
             self.Masks = np.empty(
-                (len(glob.glob(os.path.join(folder_path, '*.png'))), 512, 512))
+                (len(glob.glob(os.path.join(folder_path, '*.png'))), 512, 512), dtype=np.int64)
             for i, mask_filename in enumerate(sorted(glob.glob(os.path.join(folder_path, '*.png')))):
                 mask = Image.open(mask_filename)
                 mask = np.array(mask)
@@ -34,9 +37,9 @@ class p2_dataset(Dataset):
                 self.Masks[i, mask == 0] = 6  # (Black: 000) Unknown
 
         else:
-            self.Filenames = [file for file in os.listdir(
-                folder_path) if file.endswith('.png')]
+            self.Filenames = glob.glob(os.path.join(folder_path, '*.jpg'))
             self.Filenames.sort()
+            self.Filenames = [os.path.basename(i) for i in self.Filenames]
 
     def __getitem__(self, idx):
         if self.Train:
@@ -49,6 +52,20 @@ class p2_dataset(Dataset):
 
 
 if __name__ == '__main__':
+    import torch
     from torchvision import transforms
     dst = p2_dataset('./hw1_data/hw1_data/p2_data/train',
                      transform=transforms.ToTensor(), train=False)
+    mean = torch.zeros(3)
+    std = torch.zeros(3)
+    # for x, _ in dst:
+    #     mean += x.mean(dim=(1, 2))
+    #     std += x.std(dim=(1, 2))
+    dst, _ = torch.utils.data.random_split(dst, [2, len(dst) - 2])
+    print(type(dst), len(dst))
+    for x, y in DataLoader(dst, 1):
+        print(x.shape, y)
+
+    mean /= len(dst)
+    std /= len(dst)
+    print(mean, std)

@@ -1,3 +1,4 @@
+import os
 import sys
 
 import imageio
@@ -13,7 +14,7 @@ from P2_models import FCN32s
 
 def pred2image(batch_preds, batch_names, out_path):
     # batch_preds = (b, H, W)
-    for pred in batch_preds:
+    for pred, name in zip(batch_preds, batch_names):
         pred = pred.detach().cpu().numpy()
         pred_img = np.zeros((512, 512, 3), dtype=np.uint8)
         pred_img[np.where(pred == 0)] = [0, 255, 255]
@@ -23,21 +24,32 @@ def pred2image(batch_preds, batch_names, out_path):
         pred_img[np.where(pred == 4)] = [0, 0, 255]
         pred_img[np.where(pred == 5)] = [255, 255, 255]
         pred_img[np.where(pred == 6)] = [0, 0, 0]
-        imageio.imwrite('tmp.png', pred_img)
+        imageio.imwrite(os.path.join(out_path, name), pred_img)
 
 
-net = FCN32s(extractor=vgg16())
-net.load_state_dict(torch.load('./P2_A_checkpoint/30_model.pth'))
+device = torch.device(
+    'cuda') if torch.cuda.is_available() else torch.device('cpu')
+
+net = FCN32s()
+net.load_state_dict(torch.load('./P2_A_checkpoint/best_model.pth'))
+net = net.to(device)
 
 input_folder = sys.argv[1]
 output_folder = sys.argv[2]
 
 test_dataset = p2_dataset(input_folder, train=False)
-test_loader = torch.utils.data.DataLoader(test_dataset, 1)
+test_loader = torch.utils.data.DataLoader(test_dataset, 16)
 
+try:
+    os.makedirs(output_folder, exist_ok=True)
+except:
+    pass
 for x, filenames in test_loader:
     with torch.no_grad():
+        x = x.to(device)
         out = net(x)
+        print(out[0, :, 192, 192])
     pred = out.argmax(dim=1)
+
     print(filenames)
-    pred2image(pred, filenames, './')
+    pred2image(pred, filenames, output_folder)
