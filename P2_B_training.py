@@ -2,14 +2,14 @@ import os
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torchvision.transforms as trns
 from sklearn.metrics import jaccard_score
-from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from P2_dataloader import p2_dataset
-from P2_models import U_Net
+from UNETpp import NestedUNet
 
 # load data
 mean = [0.4085, 0.3785, 0.2809]  # calculated on training set at dataloader.py
@@ -33,8 +33,7 @@ valid_dataset = p2_dataset(
     train=True,
 )
 
-batch_size = 8
-
+batch_size = 4
 train_loader = DataLoader(
     dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 valid_loader = DataLoader(
@@ -44,53 +43,59 @@ device = torch.device('cuda')
 epochs = 300
 best_loss = 5.0
 ckpt_path = f'./P2_B_checkpoint'
+accum_steps = 3
 
-# model
-net = U_Net()
+
+net = NestedUNet(num_classes=7)
 net = net.to(device)
 net.train()
 loss_fn = nn.CrossEntropyLoss()
-optim = torch.optim.Adam(net.parameters(), lr=0.003)
+optim = torch.optim.Adam(net.parameters(), lr=0.001)
 
 if not os.path.isdir(ckpt_path):
     os.mkdir(ckpt_path)
 
+
 for epoch in range(1, epochs + 1):
     for x, y in tqdm(train_loader):
         x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
-        optim.zero_grad()
-        logits = net(x)  # no need to calculate soft-max
+        logits = net(x)
         loss = loss_fn(logits, y)
-        loss.backward()
-        optim.step()
+        loss /= accum_steps
+        loss.backwards()
+        if (epoch % accum_steps) == 0 or (epoch == epochs):
+            optim.step()
+            optim.zero_grad()
 
-    net.eval()
-    with torch.no_grad():
-        va_loss = 0
-        mIOUs = []
-        for x, y in tqdm(valid_loader):
-            x, y = x.to(device), y.to(device)
-            out = net(x)
-            pred = out.argmax(dim=1)
-            va_loss += nn.functional.cross_entropy(out, y).item()
+    if (epoch % accum_steps) == 0 or (epoch == epochs):
+        net.eval()
+        with torch.no_grad():
+            va_loss = 0
+            mIOUs = []
+            for x, y in tqdm(valid_loader):
+                x, y = x.to(device), y.to(device)
+                out = net(x)
+                pred = out.argmax(dim=1)
+                va_loss += nn.functional.cross_entropy(out, y).item()
 
-            pred = pred.detach().cpu().numpy().astype(np.int64)
-            y = y.detach().cpu().numpy().astype(np.int64)
-            for p, gt in zip(pred, y):
-                mIOUs.append(jaccard_score(
-                    p.flatten(), gt.flatten(), average='macro'))
+                pred = pred.detach().cpu().numpy().astype(np.int64)
+                y = y.detach().cpu().numpy().astype(np.int64)
+                for p, gt in zip(pred, y):
+                    mIOUs.append(jaccard_score(
+                        gt.flatten(), p.flatten(), average='macro'))
 
-        va_loss /= len(valid_loader)
-        mIOU = sum(mIOUs) / len(mIOUs)
-    net.train()
+            va_loss /= len(valid_loader)
+            mIOU = sum(mIOUs) / len(mIOUs)
+        net.train()
+        print(f"epoch {epoch}, mIOU = {mIOU}, va_loss = {va_loss}")
+        if va_loss <= best_loss:
+            best_loss = va_loss
+            torch.save(optim.state_dict(), os.path.join(
+                ckpt_path, 'best_optimizer.pth'))
+            torch.save(net.state_dict(), os.path.join(
+                ckpt_path, 'best_model.pth'))
+            print("new model saved sucessfully!")
 
-    print(f"epoch {epoch}, mIOU = {mIOU}, va_loss = {va_loss}")
-    if va_loss <= best_loss:
-        best_loss = va_loss
-        torch.save(optim.state_dict(), os.path.join(
-            ckpt_path, 'best_optimizer.pth'))
-        torch.save(net.state_dict(), os.path.join(ckpt_path, 'best_model.pth'))
-        print("new model saved sucessfully!")
     if (epoch % 10) == 0 or epoch == 1:
         torch.save(net.state_dict(), os.path.join(
             ckpt_path, f'{epoch}_model.pth'))
