@@ -49,7 +49,7 @@ net = U_Net()
 net = net.to(device)
 net.train()
 loss_fn = nn.CrossEntropyLoss()
-optim = torch.optim.Adam(net.parameters(), lr=0.003)
+optim = torch.optim.SGD(net.parameters(), lr=0.001)
 
 if not os.path.isdir(ckpt_path):
     os.mkdir(ckpt_path)
