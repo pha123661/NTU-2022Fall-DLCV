@@ -62,7 +62,7 @@ for epoch in range(1, epochs + 1):
         logits = net(x)
         loss = loss_fn(logits, y)
         loss /= accum_steps
-        loss.backwards()
+        loss.backward()
         if (epoch % accum_steps) == 0 or (epoch == epochs):
             optim.step()
             optim.zero_grad()
