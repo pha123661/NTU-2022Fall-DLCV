@@ -68,7 +68,7 @@ class U_Net(nn.Module):
         n_class=7,
     ) -> None:
         super().__init__()
-        self.Encoder = timm.create_model('resnet50', features_only=True)
+        self.Encoder = timm.create_model('resnet50', features_only=True, pretrained=True)
         dec_chans = [2048, 1024, 512, 256, 64]
         self.Decoder = U_Decoder(dec_chans)
         self.clf = nn.Conv2d(dec_chans[-1], n_class, 1)
