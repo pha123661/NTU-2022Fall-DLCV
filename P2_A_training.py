@@ -53,9 +53,6 @@ ckpt_path = f'./P2_A_checkpoint'
 # model
 net = FCN32s()
 net = net.to(device)
-# freeze pretrained VGG
-for p in net.features.parameters():
-    p.requires_grad = False
 net.train()
 loss_fn = nn.CrossEntropyLoss()
 optim = torch.optim.SGD(net.parameters(), lr=0.03)
