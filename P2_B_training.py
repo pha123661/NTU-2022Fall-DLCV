@@ -46,7 +46,7 @@ ckpt_path = f'./P2_B_checkpoint'
 accum_steps = 3
 
 
-net = NestedUNet(num_classes=7)
+net = NestedUNet(num_classes=7, deep_supervision=True)
 net = net.to(device)
 net.train()
 loss_fn = nn.CrossEntropyLoss()
@@ -59,9 +59,12 @@ if not os.path.isdir(ckpt_path):
 for epoch in range(1, epochs + 1):
     for x, y in tqdm(train_loader):
         x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
-        logits = net(x)
-        loss = loss_fn(logits, y)
+        outs = net(x)
+        loss = 0
+        for logits in outs:
+            loss += loss_fn(logits, y)
         loss /= accum_steps
+        loss /= len(outs)
         loss.backward()
         if (epoch % accum_steps) == 0 or (epoch == epochs):
             optim.step()
