@@ -2,14 +2,14 @@ import os
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torchvision.transforms as trns
 from sklearn.metrics import jaccard_score
+from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from P2_dataloader import p2_dataset
-from UNETpp import NestedUNet
+from P2_models import U_Net
 
 # load data
 mean = [0.4085, 0.3785, 0.2809]  # calculated on training set at dataloader.py
@@ -33,7 +33,7 @@ valid_dataset = p2_dataset(
     train=True,
 )
 
-batch_size = 4
+batch_size = 8
 train_loader = DataLoader(
     dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 valid_loader = DataLoader(
@@ -43,32 +43,25 @@ device = torch.device('cuda')
 epochs = 300
 best_loss = 5.0
 ckpt_path = f'./P2_B_checkpoint'
-accum_steps = 3
 
-
-net = NestedUNet(num_classes=7, deep_supervision=True)
+# model
+net = U_Net()
 net = net.to(device)
 net.train()
 loss_fn = nn.CrossEntropyLoss()
-optim = torch.optim.Adam(net.parameters(), lr=0.001)
+optim = torch.optim.Adam(net.parameters(), lr=0.003)
 
 if not os.path.isdir(ckpt_path):
     os.mkdir(ckpt_path)
 
-
 for epoch in range(1, epochs + 1):
-    for idx, (x, y) in enumerate(tqdm(train_loader), 1):
+    for x, y in tqdm(train_loader):
         x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
-        outs = net(x)
-        loss = 0
-        for logits in outs:
-            loss += loss_fn(logits, y)
-        loss /= accum_steps
-        loss /= len(outs)
+        optim.zero_grad()
+        logits = net(x)  # no need to calculate soft-max
+        loss = loss_fn(logits, y)
         loss.backward()
-        if (idx % accum_steps) == 0 or (idx == len(train_loader)):
-            optim.step()
-            optim.zero_grad()
+        optim.step()
 
     net.eval()
     with torch.no_grad():
@@ -82,7 +75,7 @@ for epoch in range(1, epochs + 1):
 
             pred = pred.detach().cpu().numpy().astype(np.int64)
             y = y.detach().cpu().numpy().astype(np.int64)
-            for p, gt in zip(pred, y):
+            for gt, p in zip(y, pred):
                 mIOUs.append(jaccard_score(
                     gt.flatten(), p.flatten(), average='macro'))
 
@@ -90,14 +83,13 @@ for epoch in range(1, epochs + 1):
         mIOU = sum(mIOUs) / len(mIOUs)
     net.train()
     print(f"epoch {epoch}, mIOU = {mIOU}, va_loss = {va_loss}")
+
     if va_loss <= best_loss:
         best_loss = va_loss
         torch.save(optim.state_dict(), os.path.join(
             ckpt_path, 'best_optimizer.pth'))
-        torch.save(net.state_dict(), os.path.join(
-            ckpt_path, 'best_model.pth'))
+        torch.save(net.state_dict(), os.path.join(ckpt_path, 'best_model.pth'))
         print("new model saved sucessfully!")
-
     if (epoch % 10) == 0 or epoch == 1:
         torch.save(net.state_dict(), os.path.join(
             ckpt_path, f'{epoch}_model.pth'))

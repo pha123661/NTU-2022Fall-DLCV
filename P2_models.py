@@ -68,8 +68,10 @@ class U_Net(nn.Module):
         n_class=7,
     ) -> None:
         super().__init__()
-        self.Encoder = timm.create_model('resnet50', features_only=True, pretrained=True)
-        dec_chans = [2048, 1024, 512, 256, 64]
+        self.Encoder = timm.create_model(
+            'resnetv2_101x1_bitm', features_only=True, pretrained=True)
+        dec_chans = self.Encoder.feature_info.channels()
+        dec_chans.reverse()
         self.Decoder = U_Decoder(dec_chans)
         self.clf = nn.Conv2d(dec_chans[-1], n_class, 1)
 
@@ -88,6 +90,8 @@ class U_Net(nn.Module):
 if __name__ == '__main__':
     net = U_Net().cuda()
     ret = net(torch.rand(1, 3, 512, 512).cuda())
+    pytorch_total_params = sum(p.numel() for p in net.parameters())
+    print(pytorch_total_params)
     print(ret.shape)
 
 
