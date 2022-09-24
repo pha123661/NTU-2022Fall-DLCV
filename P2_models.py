@@ -1,3 +1,4 @@
+import timm
 import torch
 import torch.nn as nn
 import torchvision
@@ -12,45 +13,29 @@ class U_block(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             nn.Conv2d(in_chan, out_chan, 3),
+            nn.BatchNorm2d(out_chan),
             nn.ReLU(True),
             nn.Conv2d(out_chan, out_chan, 3),
+            nn.BatchNorm2d(out_chan),
+            nn.ReLU(True),
         )
 
     def forward(self, x):
         return self.net(x)
 
 
-class U_Encoder(nn.Module):
-    '''Encoder of U-Net'''
-
-    def __init__(self, chans=[3, 64, 128, 256, 512, 1024]) -> None:
-        super().__init__()
-        self.chans = chans
-        self.blocks = nn.ModuleList()
-        for idx in range(len(chans) - 1):
-            self.blocks.append(U_block(chans[idx], chans[idx + 1]))
-
-    def forward(self, x):
-        ret = []
-        for block in self.blocks:
-            x = block(x)
-            ret.append(x)
-            x = nn.functional.max_pool2d(x, kernel_size=2)
-        return ret
-
-
 class U_Decoder(nn.Module):
     '''Decoder of U-Net'''
 
-    def __init__(self, chans=[1024, 512, 256, 128, 64]) -> None:
+    def __init__(self, chans) -> None:
         super().__init__()
         self.chans = chans
         self.blocks = nn.ModuleList()
         self.up_convs = nn.ModuleList()
         for idx in range(len(chans) - 1):
-            self.blocks.append(U_block(chans[idx], chans[idx + 1]))
             self.up_convs.append(nn.ConvTranspose2d(
                 chans[idx], chans[idx + 1], 2, 2))
+            self.blocks.append(U_block(2 * chans[idx + 1], chans[idx + 1]))
 
     def forward(self, skip_cons, x):
         def crop_feature(feature, shape):
@@ -58,15 +43,18 @@ class U_Decoder(nn.Module):
             return torchvision.transforms.CenterCrop([H, W])(feature)
 
         for block, up_conv, feature in zip(self.blocks, self.up_convs, skip_cons):
+            # print("#########################")
+            # print("x:", x.shape)
+            # x = up_conv(x)
+            # print("x_up:", x.shape)
+            # feature = crop_feature(feature, x.shape)
+            # print("f:", feature.shape)
+            # x = torch.cat((feature, x), dim=1)
+            # print('cat:', x.shape)
+            # print(block)
+            # x = block(x)
+
             x = up_conv(x)
-            '''
-            input shape = (b, 3, 512, 512)
-            feature.shape                  x.shape
-            torch.Size([1, 512, 56, 56])   torch.Size([1, 512, 48, 48])
-            torch.Size([1, 256, 121, 121]) torch.Size([1, 256, 88, 88])
-            torch.Size([1, 128, 250, 250]) torch.Size([1, 128, 168, 168])
-            torch.Size([1, 64, 508, 508])  torch.Size([1, 64, 328, 328])
-            '''
             feature = crop_feature(feature, x.shape)
             x = torch.cat((feature, x), dim=1)
             x = block(x)
@@ -77,12 +65,12 @@ class U_Decoder(nn.Module):
 class U_Net(nn.Module):
     def __init__(
         self,
-        enc_chans=[3, 64, 128, 256, 512, 1024],
-        dec_chans=[1024, 512, 256, 128, 64],
         n_class=7,
     ) -> None:
         super().__init__()
-        self.Encoder, self.Decoder = U_Encoder(enc_chans), U_Decoder(dec_chans)
+        self.Encoder = timm.create_model('resnet50', features_only=True)
+        dec_chans = [2048, 1024, 512, 256, 64]
+        self.Decoder = U_Decoder(dec_chans)
         self.clf = nn.Conv2d(dec_chans[-1], n_class, 1)
 
     def forward(self, x):
