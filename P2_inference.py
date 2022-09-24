@@ -9,7 +9,7 @@ from PIL import Image
 from torchvision.models import vgg16
 
 from P2_dataloader import p2_dataset
-from P2_models import FCN32s
+from P2_models import U_Net
 
 
 def pred2image(batch_preds, batch_names, out_path):
@@ -24,14 +24,15 @@ def pred2image(batch_preds, batch_names, out_path):
         pred_img[np.where(pred == 4)] = [0, 0, 255]
         pred_img[np.where(pred == 5)] = [255, 255, 255]
         pred_img[np.where(pred == 6)] = [0, 0, 0]
-        imageio.imwrite(os.path.join(out_path, name), pred_img)
+        imageio.imwrite(os.path.join(
+            out_path, name.replace('.jpg', '.png')), pred_img)
 
 
 device = torch.device(
     'cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-net = FCN32s()
-net.load_state_dict(torch.load('./P2_A_checkpoint/best_model.pth'))
+net = U_Net()
+net.load_state_dict(torch.load('./P2_B_checkpoint/best_model.pth'))
 net = net.to(device)
 
 input_folder = sys.argv[1]
