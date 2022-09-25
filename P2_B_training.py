@@ -18,6 +18,8 @@ std = [0.1155, 0.0895, 0.0772]
 train_dataset = p2_dataset(
     'hw1_data/hw1_data/p2_data/train',
     transform=trns.Compose([
+        trns.ColorJitter(brightness=0.3, contrast=0.3,
+                         saturation=0.3, hue=0),
         trns.ToTensor(),
         trns.Normalize(mean=mean, std=std),
     ]),
@@ -33,7 +35,7 @@ valid_dataset = p2_dataset(
     train=True,
 )
 
-batch_size = 8
+batch_size = 16
 train_loader = DataLoader(
     dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 valid_loader = DataLoader(
@@ -62,6 +64,8 @@ for epoch in range(1, epochs + 1):
         loss = loss_fn(logits, y)
         loss.backward()
         optim.step()
+
+    print(f"epoch {epoch}, train loss = {loss.item()}")
 
     net.eval()
     with torch.no_grad():

@@ -69,9 +69,14 @@ class U_Net(nn.Module):
     ) -> None:
         super().__init__()
         self.Encoder = timm.create_model(
-            'resnetv2_101x1_bitm', features_only=True, pretrained=True)
+            'resnetv2_50x1_bit_distilled', features_only=True, pretrained=True, out_indices=[0, 2, 4])
         dec_chans = self.Encoder.feature_info.channels()
         dec_chans.reverse()
+        self.center_block = nn.Sequential(
+            nn.Conv2d(dec_chans[0], dec_chans[0], 3, padding=1),
+            nn.BatchNorm2d(dec_chans[0]),
+            nn.ReLU(True)
+        )
         self.Decoder = U_Decoder(dec_chans)
         self.clf = nn.Conv2d(dec_chans[-1], n_class, 1)
 
@@ -80,8 +85,11 @@ class U_Net(nn.Module):
 
         features = self.Encoder(x)
         features.reverse()  # from down to top
+        skips = features[1:]
+        x = features[0]
+        x = self.center_block(x)
         # bottom feature map doesn't need concatenation
-        x = self.Decoder(features[1:], features[0])
+        x = self.Decoder(skips, x)
         x = self.clf(x)
         x = nn.functional.interpolate(x, img_size)
         return x
