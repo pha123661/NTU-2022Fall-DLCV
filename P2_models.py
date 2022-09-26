@@ -69,8 +69,9 @@ class U_Net(nn.Module):
     ) -> None:
         super().__init__()
         self.Encoder = timm.create_model(
-            'resnetv2_50x1_bit_distilled', features_only=True, pretrained=True, out_indices=[0, 2, 4])
+            'resnet34', features_only=True, pretrained=True)
         dec_chans = self.Encoder.feature_info.channels()
+        print("U_net chans:", dec_chans)
         dec_chans.reverse()
         self.center_block = nn.Sequential(
             nn.Conv2d(dec_chans[0], dec_chans[0], 3, padding=1),
@@ -80,8 +81,13 @@ class U_Net(nn.Module):
         self.Decoder = U_Decoder(dec_chans)
         self.clf = nn.Conv2d(dec_chans[-1], n_class, 1)
 
+        print("U_net #param:", sum(p.numel() for p in self.parameters()))
+
     def forward(self, x):
-        img_size = tuple(x.shape[-2:])
+        def crop_feature(feature, shape):
+            _, _, H, W = shape
+            return torchvision.transforms.CenterCrop([H, W])(feature)
+        in_shape = x.shape[:]
 
         features = self.Encoder(x)
         features.reverse()  # from down to top
@@ -91,7 +97,7 @@ class U_Net(nn.Module):
         # bottom feature map doesn't need concatenation
         x = self.Decoder(skips, x)
         x = self.clf(x)
-        x = nn.functional.interpolate(x, img_size)
+        x = crop_feature(x, in_shape)
         return x
 
 

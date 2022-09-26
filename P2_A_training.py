@@ -3,19 +3,18 @@ import os
 import numpy as np
 import torch
 import torchvision.transforms as trns
-from sklearn.metrics import jaccard_score
 from torch import nn
-from torch.utils.data import DataLoader, random_split
-from torchvision.models import VGG16_Weights, vgg16
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from P2_dataloader import p2_dataset
 from P2_models import FCN32s
 
 # load data
-mean = [0.4085, 0.3785, 0.2809]  # calculated on training set at dataloader.py
-std = [0.1155, 0.0895, 0.0772]
+mean = [0.485, 0.456, 0.406]  # imagenet
+std = [0.229, 0.224, 0.225]
 
-labeled_dataset = p2_dataset(
+train_dataset = p2_dataset(
     'hw1_data/hw1_data/p2_data/train',
     transform=trns.Compose([
         trns.ToTensor(),
@@ -24,10 +23,7 @@ labeled_dataset = p2_dataset(
     train=True,
 )
 
-train_dataset, valid_dataset = random_split(
-    labeled_dataset, [1800, len(labeled_dataset) - 1800])
-
-test_dataset = p2_dataset(
+valid_dataset = p2_dataset(
     'hw1_data/hw1_data/p2_data/validation',
     transform=trns.Compose([
         trns.ToTensor(),
@@ -42,8 +38,6 @@ train_loader = DataLoader(
     dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 valid_loader = DataLoader(
     dataset=valid_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
-test_loader = DataLoader(
-    dataset=test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
 device = torch.device('cuda')
 epochs = 300
@@ -55,13 +49,13 @@ net = FCN32s()
 net = net.to(device)
 net.train()
 loss_fn = nn.CrossEntropyLoss()
-optim = torch.optim.SGD(net.parameters(), lr=0.03)
+optim = torch.optim.SGD(net.parameters(), lr=0.003)
 
 if not os.path.isdir(ckpt_path):
     os.mkdir(ckpt_path)
 
 for epoch in range(1, epochs + 1):
-    for x, y in train_loader:
+    for x, y in tqdm(train_loader):
         x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
 
         optim.zero_grad()
@@ -73,8 +67,8 @@ for epoch in range(1, epochs + 1):
     net.eval()
     with torch.no_grad():
         va_loss = 0
-        mIOUs = []
-        for x, y in valid_loader:
+        ACCs = []
+        for x, y in tqdm(valid_loader):
             x, y = x.to(device), y.to(device)
             out = net(x)
             pred = out.argmax(dim=1)
@@ -82,15 +76,13 @@ for epoch in range(1, epochs + 1):
 
             pred = pred.detach().cpu().numpy().astype(np.int64)
             y = y.detach().cpu().numpy().astype(np.int64)
-            for p, gt in zip(pred, y):
-                mIOUs.append(jaccard_score(
-                    p.flatten(), gt.flatten(), average='macro'))
+            ACCs.append(np.sum(pred == y) / len(y.flatten()))
 
         va_loss /= len(valid_loader)
-        mIOU = sum(mIOUs) / len(mIOUs)
+        acc = sum(ACCs) / len(ACCs)
     net.train()
 
-    print(f"epoch {epoch}, mIOU = {mIOU}, va_loss = {va_loss}")
+    print(f"epoch {epoch}, Acc = {acc}, va_loss = {va_loss}")
     if va_loss <= best_loss:
         best_loss = va_loss
         torch.save(optim.state_dict(), os.path.join(
