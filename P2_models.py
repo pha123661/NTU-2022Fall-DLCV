@@ -101,14 +101,6 @@ class U_Net(nn.Module):
         return x
 
 
-if __name__ == '__main__':
-    net = U_Net().cuda()
-    ret = net(torch.rand(1, 3, 512, 512).cuda())
-    pytorch_total_params = sum(p.numel() for p in net.parameters())
-    print(pytorch_total_params)
-    print(ret.shape)
-
-
 ########## P2A ##########
 
 
@@ -122,7 +114,7 @@ class my_FCN32s(nn.Module):
         # fc6
         self.fc6 = nn.Sequential(
             nn.Conv2d(512, 4096, 7),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.Dropout2d(),
         )
 
@@ -134,7 +126,7 @@ class my_FCN32s(nn.Module):
         # fc7
         self.fc7 = nn.Sequential(
             nn.Conv2d(4096, 4096, 1),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.Dropout2d(),
         )
 
@@ -143,9 +135,14 @@ class my_FCN32s(nn.Module):
         self.fc7[0].bias.data = vgg16(
             weights=VGG16_Weights.DEFAULT).classifier[3].bias.data.view(self.fc7[0].bias.size())
 
-        self.score_fr = nn.Conv2d(4096, n_class, 1)
-        self.upscore = nn.ConvTranspose2d(
-            n_class, n_class, 64, stride=32)
+        self.score_fr = nn.Sequential(
+            nn.Conv2d(4096, n_class, 1),
+            nn.ReLU()
+        )
+
+        self.upscore = nn.Sequential(
+            nn.ConvTranspose2d(n_class, n_class, 64, stride=32)
+        )
 
     def forward(self, x) -> torch.Tensor:
         raw_h, raw_w = x.shape[2], x.shape[3]
@@ -161,3 +158,11 @@ class my_FCN32s(nn.Module):
 
 def FCN32s():
     return my_FCN32s()
+
+
+if __name__ == '__main__':
+    net = FCN32s().cuda()
+    ret = net(torch.rand(1, 3, 512, 512).cuda())
+    pytorch_total_params = sum(p.numel() for p in net.parameters())
+    print(pytorch_total_params)
+    print(ret.shape)

@@ -40,7 +40,7 @@ valid_loader = DataLoader(
     dataset=valid_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
 device = torch.device('cuda')
-epochs = 300
+epochs = 100
 best_loss = 5.0
 ckpt_path = f'./P2_A_checkpoint'
 
