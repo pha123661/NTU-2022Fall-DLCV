@@ -35,9 +35,9 @@ valid_dataset = p2_dataset(
 batch_size = 8
 
 train_loader = DataLoader(
-    dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
 valid_loader = DataLoader(
-    dataset=valid_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    dataset=valid_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
 
 device = torch.device('cuda')
 epochs = 300
@@ -46,11 +46,10 @@ ckpt_path = f'./P2_B_checkpoint'
 
 # model
 net = createDeepLabv3(7)
-# net.copy_params_from_vgg16(models.vgg16(pretrained=True))
 net = net.to(device)
 net.train()
 loss_fn = nn.CrossEntropyLoss()
-optim = torch.optim.SGD(net.parameters(), lr=0.003, momentum=0.9)
+optim = torch.optim.SGD(net.parameters(), lr=0.001, weight_decay=1e-5)
 
 if not os.path.isdir(ckpt_path):
     os.mkdir(ckpt_path)
@@ -60,8 +59,9 @@ for epoch in range(1, epochs + 1):
         x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
 
         optim.zero_grad()
-        logits = net(x)['out']  # no need to calculate soft-max
-        loss = loss_fn(logits, y)
+        out = net(x)  # no need to calculate soft-max
+        logits, aux_logits = out['out'], out['aux']
+        loss = loss_fn(logits, y) + 0.1 * loss_fn(aux_logits, y)
         loss.backward()
         optim.step()
 
@@ -90,6 +90,6 @@ for epoch in range(1, epochs + 1):
             ckpt_path, 'best_optimizer.pth'))
         torch.save(net.state_dict(), os.path.join(ckpt_path, 'best_model.pth'))
         print("new model saved sucessfully!")
-    if (epoch % 10) == 0 or epoch == 1:
-        torch.save(net.state_dict(), os.path.join(
-            ckpt_path, f'{epoch}_model.pth'))
+
+    torch.save(net.state_dict(), os.path.join(
+        ckpt_path, f'{epoch}_model.pth'))

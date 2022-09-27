@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torchvision
 from torchvision.models import VGG16_Weights, vgg16
-from torchvision.models.segmentation.deeplabv3 import DeepLabHead
+from torchvision.models.segmentation.deeplabv3 import DeepLabHead, FCNHead
 
 
 ########## P2B ##########
@@ -164,10 +164,8 @@ def FCN32s():
 def createDeepLabv3(n_classes=7):
     model = torch.hub.load('pytorch/vision:v0.10.0',
                            'deeplabv3_resnet50', pretrained=True)
-
-    # Added a Sigmoid activation after the last convolution layer
     model.classifier = DeepLabHead(2048, n_classes)
-    # Set the model in training mode
+    model.aux_classifier = FCNHead(1024, n_classes)
     model.train()
     return model
 
@@ -175,7 +173,7 @@ def createDeepLabv3(n_classes=7):
 if __name__ == '__main__':
     model = createDeepLabv3(7)
     model.train()
-    print(model(torch.rand(3, 3, 512, 512)))
+    print(model(torch.rand(3, 3, 512, 512))['aux'].shape)
 
     # net = FCN32s().cuda()
     # ret = net(torch.rand(1, 3, 512, 512).cuda())
