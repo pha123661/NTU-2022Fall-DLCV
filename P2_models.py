@@ -161,11 +161,18 @@ def FCN32s():
     return my_FCN32s()
 
 
-def createDeepLabv3(n_classes=7):
-    model = torch.hub.load('pytorch/vision:v0.10.0',
-                           'deeplabv3_resnet50', pretrained=True)
-    model.classifier = DeepLabHead(2048, n_classes)
-    model.aux_classifier = FCNHead(1024, n_classes)
+def createDeepLabv3(n_classes=7, mode='mobile'):
+    if mode == 'resnet':
+        model = torch.hub.load('pytorch/vision:v0.10.0',
+                               'deeplabv3_resnet50', pretrained=True)
+        model.classifier = DeepLabHead(2048, n_classes)
+        model.aux_classifier = FCNHead(1024, n_classes)
+    elif mode == 'mobile':
+        model = torch.hub.load('pytorch/vision:v0.10.0',
+                               'deeplabv3_mobilenet_v3_large', pretrained=True)
+        model.classifier = DeepLabHead(960, n_classes)
+        model.aux_classifier = FCNHead(40, n_classes)
+
     model.train()
     return model
 

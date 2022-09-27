@@ -14,7 +14,7 @@ def pred2image(batch_preds, batch_names, out_path):
     # batch_preds = (b, H, W)
     for pred, name in zip(batch_preds, batch_names):
         pred = pred.detach().cpu().numpy()
-        pred_img = np.zeros((512, 512, 3), dtype=int)
+        pred_img = np.zeros((512, 512, 3), dtype=np.uint8)
         pred_img[np.where(pred == 0)] = [0, 255, 255]
         pred_img[np.where(pred == 1)] = [255, 255, 0]
         pred_img[np.where(pred == 2)] = [255, 0, 255]
@@ -23,7 +23,7 @@ def pred2image(batch_preds, batch_names, out_path):
         pred_img[np.where(pred == 5)] = [255, 255, 255]
         pred_img[np.where(pred == 6)] = [0, 0, 0]
         imageio.imwrite(os.path.join(
-            out_path, name.replace('.jpg', '.png')), pred_img, pilmode="RGB")
+            out_path, name.replace('.jpg', '.png')), pred_img)
 
 
 device = torch.device(
@@ -60,6 +60,6 @@ for x, filenames in test_loader:
         x = x.to(device)
         out = net(x)['out']
     pred = out.argmax(dim=1)
-
+    print(pred[0])
     print(filenames)
     pred2image(pred, filenames, output_folder)

@@ -10,6 +10,24 @@ from tqdm import tqdm
 from P2_dataloader import p2_dataset
 from P2_models import createDeepLabv3
 
+
+def mean_iou_score(pred, labels):
+    '''
+    Compute mean IoU score over 6 classes
+    '''
+    mean_ious = []
+    for i in range(6):
+        tp_fp = np.sum(pred == i)
+        tp_fn = np.sum(labels == i)
+        tp = np.sum((pred == i) * (labels == i))
+        if (tp_fp + tp_fn - tp) == 0:
+            continue
+        iou = tp / (tp_fp + tp_fn - tp)
+        mean_ious.append(iou)
+
+    return sum(mean_ious) / len(mean_ious)
+
+
 # load data
 mean = [0.485, 0.456, 0.406]  # imagenet
 std = [0.229, 0.224, 0.225]
@@ -32,7 +50,7 @@ valid_dataset = p2_dataset(
     train=True,
 )
 
-batch_size = 8
+batch_size = 24
 
 train_loader = DataLoader(
     dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
@@ -77,7 +95,7 @@ for epoch in range(1, epochs + 1):
 
             pred = pred.detach().cpu().numpy().astype(np.int64)
             y = y.detach().cpu().numpy().astype(np.int64)
-            ACCs.append(np.sum(pred == y) / len(y.flatten()))
+            ACCs.append(mean_iou_score(pred, y))
 
         va_loss /= len(valid_loader)
         acc = sum(ACCs) / len(ACCs)
