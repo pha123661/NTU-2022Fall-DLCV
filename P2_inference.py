@@ -4,12 +4,10 @@ import sys
 import imageio
 import numpy as np
 import torch
-import torchvision.transforms.functional as F
-from PIL import Image
-from torchvision.models import vgg16
+from torchvision import transforms
 
 from P2_dataloader import p2_dataset
-from P2_models import U_Net
+from P2_models import createDeepLabv3
 
 
 def pred2image(batch_preds, batch_names, out_path):
@@ -31,14 +29,21 @@ def pred2image(batch_preds, batch_names, out_path):
 device = torch.device(
     'cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-net = U_Net()
-net.load_state_dict(torch.load('./P2_B_checkpoint/best_model.pth'))
+net = createDeepLabv3(7)
+net.load_state_dict(torch.load('./P2_A_checkpoint_2/best_model.pth'))
 net = net.to(device)
+net.eval()
 
 input_folder = sys.argv[1]
 output_folder = sys.argv[2]
 
-test_dataset = p2_dataset(input_folder, train=False)
+mean = [0.485, 0.456, 0.406]  # imagenet
+std = [0.229, 0.224, 0.225]
+
+test_dataset = p2_dataset(input_folder, transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize(mean=mean, std=std),
+]), train=False)
 test_loader = torch.utils.data.DataLoader(test_dataset, 16)
 
 try:
@@ -48,8 +53,7 @@ except:
 for x, filenames in test_loader:
     with torch.no_grad():
         x = x.to(device)
-        out = net(x)
-        print(out[0, :, 192, 192])
+        out = net(x)['out']
     pred = out.argmax(dim=1)
 
     print(filenames)

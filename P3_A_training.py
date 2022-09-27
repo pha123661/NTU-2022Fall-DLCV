@@ -9,7 +9,7 @@ from torchvision import models
 from tqdm import tqdm
 
 from P2_dataloader import p2_dataset
-from P2_models import FCN32s
+from P2_models import createDeepLabv3
 
 # load data
 mean = [0.485, 0.456, 0.406]  # imagenet
@@ -41,13 +41,13 @@ valid_loader = DataLoader(
     dataset=valid_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
 device = torch.device('cuda')
-epochs = 100
+epochs = 300
 best_loss = 5.0
-ckpt_path = f'./P2_A_checkpoint'
+ckpt_path = f'./P2_A_checkpoint_2'
 
 # model
-net = FCN32s()
-net.copy_params_from_vgg16(models.vgg16(pretrained=True))
+net = createDeepLabv3(7)
+# net.copy_params_from_vgg16(models.vgg16(pretrained=True))
 net = net.to(device)
 net.train()
 loss_fn = nn.CrossEntropyLoss()
@@ -61,7 +61,7 @@ for epoch in range(1, epochs + 1):
         x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
 
         optim.zero_grad()
-        logits = net(x)  # no need to calculate soft-max
+        logits = net(x)['out']  # no need to calculate soft-max
         loss = loss_fn(logits, y)
         loss.backward()
         optim.step()
@@ -72,7 +72,7 @@ for epoch in range(1, epochs + 1):
         ACCs = []
         for x, y in tqdm(valid_loader):
             x, y = x.to(device), y.to(device)
-            out = net(x)
+            out = net(x)['out']
             pred = out.argmax(dim=1)
             va_loss += nn.functional.cross_entropy(out, y).item()
 
