@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torchvision
 from torchvision.models import VGG16_Weights, vgg16
+from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 
 
 ########## P2B ##########
@@ -160,9 +161,24 @@ def FCN32s():
     return my_FCN32s()
 
 
+def createDeepLabv3(n_classes=7):
+    model = torch.hub.load('pytorch/vision:v0.10.0',
+                           'deeplabv3_resnet50', pretrained=True)
+
+    # Added a Sigmoid activation after the last convolution layer
+    model.classifier = DeepLabHead(2048, n_classes)
+    # Set the model in training mode
+    model.train()
+    return model
+
+
 if __name__ == '__main__':
-    net = FCN32s().cuda()
-    ret = net(torch.rand(1, 3, 512, 512).cuda())
-    pytorch_total_params = sum(p.numel() for p in net.parameters())
-    print(pytorch_total_params)
-    print(ret.shape)
+    model = createDeepLabv3(7)
+    model.train()
+    print(model(torch.rand(3, 3, 512, 512)))
+
+    # net = FCN32s().cuda()
+    # ret = net(torch.rand(1, 3, 512, 512).cuda())
+    # pytorch_total_params = sum(p.numel() for p in net.parameters())
+    # print(pytorch_total_params)
+    # print(ret.shape)
