@@ -5,7 +5,6 @@ import torch
 import torchvision.transforms as trns
 from torch import nn
 from torch.utils.data import DataLoader
-from torchvision import models
 from tqdm import tqdm
 
 from P2_dataloader import p2_dataset
@@ -43,7 +42,7 @@ valid_loader = DataLoader(
 device = torch.device('cuda')
 epochs = 300
 best_loss = 5.0
-ckpt_path = f'./P2_A_checkpoint_2'
+ckpt_path = f'./P2_B_checkpoint'
 
 # model
 net = createDeepLabv3(7)
