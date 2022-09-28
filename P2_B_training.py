@@ -50,7 +50,7 @@ valid_dataset = p2_dataset(
     train=True,
 )
 
-batch_size = 24
+batch_size = 8
 
 train_loader = DataLoader(
     dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=6)

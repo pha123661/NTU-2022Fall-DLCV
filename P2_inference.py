@@ -29,8 +29,8 @@ def pred2image(batch_preds, batch_names, out_path):
 device = torch.device(
     'cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-net = createDeepLabv3(7)
-net.load_state_dict(torch.load('./P2_B_checkpoint/best_model.pth'))
+net = createDeepLabv3(n_classes=7, pretrained=True)
+net.load_state_dict(torch.load('./P2_B_checkpoint 0.69/best_model.pth'))
 net = net.to(device)
 net.eval()
 
