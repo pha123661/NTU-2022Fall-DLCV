@@ -1,4 +1,5 @@
 import os
+from re import T
 
 import numpy as np
 import torch
@@ -39,6 +40,7 @@ train_dataset = p2_dataset(
         trns.Normalize(mean=mean, std=std),
     ]),
     train=True,
+    augmentation=True,
 )
 
 valid_dataset = p2_dataset(
@@ -50,7 +52,7 @@ valid_dataset = p2_dataset(
     train=True,
 )
 
-batch_size = 8
+batch_size = 4
 
 train_loader = DataLoader(
     dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
@@ -58,16 +60,19 @@ valid_loader = DataLoader(
     dataset=valid_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
 
 device = torch.device('cuda')
-epochs = 300
+epochs = 50
+lr = 0.01
 best_loss = 5.0
 ckpt_path = f'./P2_B_checkpoint'
 
 # model
-net = createDeepLabv3(7)
+net = createDeepLabv3(n_classes=7, mode='resnet')
 net = net.to(device)
 net.train()
 loss_fn = nn.CrossEntropyLoss()
-optim = torch.optim.SGD(net.parameters(), lr=0.001, weight_decay=1e-5)
+optim = torch.optim.SGD(net.parameters(), lr=lr, weight_decay=1e-5)
+scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    optim, max_lr=lr, steps_per_epoch=len(train_loader), epochs=epochs)
 
 if not os.path.isdir(ckpt_path):
     os.mkdir(ckpt_path)
@@ -79,14 +84,15 @@ for epoch in range(1, epochs + 1):
         optim.zero_grad()
         out = net(x)  # no need to calculate soft-max
         logits, aux_logits = out['out'], out['aux']
-        loss = loss_fn(logits, y) + 0.1 * loss_fn(aux_logits, y)
+        loss = loss_fn(logits, y) + 0.2 * loss_fn(aux_logits, y)
         loss.backward()
         optim.step()
+        scheduler.step()
 
     net.eval()
     with torch.no_grad():
         va_loss = 0
-        ACCs = []
+        mIoUs = []
         for x, y in tqdm(valid_loader):
             x, y = x.to(device), y.to(device)
             out = net(x)['out']
@@ -95,13 +101,13 @@ for epoch in range(1, epochs + 1):
 
             pred = pred.detach().cpu().numpy().astype(np.int64)
             y = y.detach().cpu().numpy().astype(np.int64)
-            ACCs.append(mean_iou_score(pred, y))
+            mIoUs.append(mean_iou_score(pred, y))
 
         va_loss /= len(valid_loader)
-        acc = sum(ACCs) / len(ACCs)
+        acc = sum(mIoUs) / len(mIoUs)
     net.train()
 
-    print(f"epoch {epoch}, Acc = {acc}, va_loss = {va_loss}")
+    print(f"epoch {epoch}, mIoU = {acc}, va_loss = {va_loss}")
     if va_loss <= best_loss:
         best_loss = va_loss
         torch.save(optim.state_dict(), os.path.join(
