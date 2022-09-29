@@ -1,5 +1,7 @@
 import os
+from logging import LoggerAdapter
 from re import T
+from turtle import forward
 
 import numpy as np
 import torch
@@ -10,6 +12,23 @@ from tqdm import tqdm
 
 from P2_dataloader import p2_dataset
 from P2_models import createDeepLabv3
+
+
+class FocalLoss(nn.Module):
+    def __init__(
+        self,
+        alpha=0.25,
+        gamma=2,
+    ) -> None:
+        super().__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.CE = nn.CrossEntropyLoss()
+
+    def forward(self, logits, labels):
+        log_pt = -self.CE(logits, labels)
+        loss = -((1 - torch.exp(log_pt)) ** self.gamma) * self.alpha * log_pt
+        return loss
 
 
 def mean_iou_score(pred, labels):
@@ -60,7 +79,7 @@ valid_loader = DataLoader(
     dataset=valid_dataset, batch_size=batch_size, shuffle=False, num_workers=6)
 
 device = torch.device('cuda')
-epochs = 50
+epochs = 100
 lr = 0.01
 best_loss = 5.0
 ckpt_path = f'./P2_B_checkpoint'
@@ -69,8 +88,8 @@ ckpt_path = f'./P2_B_checkpoint'
 net = createDeepLabv3(n_classes=7, mode='resnet')
 net = net.to(device)
 net.train()
-loss_fn = nn.CrossEntropyLoss()
-optim = torch.optim.SGD(net.parameters(), lr=lr, weight_decay=1e-5)
+loss_fn = FocalLoss()
+optim = torch.optim.Adam(net.parameters(), lr=lr / 10, weight_decay=1e-5)
 scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optim, max_lr=lr, steps_per_epoch=len(train_loader), epochs=epochs)
 
@@ -84,7 +103,7 @@ for epoch in range(1, epochs + 1):
         optim.zero_grad()
         out = net(x)  # no need to calculate soft-max
         logits, aux_logits = out['out'], out['aux']
-        loss = loss_fn(logits, y) + 0.2 * loss_fn(aux_logits, y)
+        loss = loss_fn(logits, y) + loss_fn(aux_logits, y)
         loss.backward()
         optim.step()
         scheduler.step()

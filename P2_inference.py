@@ -29,7 +29,7 @@ def pred2image(batch_preds, batch_names, out_path):
 device = torch.device(
     'cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-net = createDeepLabv3(n_classes=7, mode='mobile')
+net = createDeepLabv3(n_classes=7, mode='resnet')
 net.load_state_dict(torch.load('./P2_B_checkpoint/best_model.pth'))
 net = net.to(device)
 net.eval()
@@ -49,7 +49,7 @@ test_dataset = p2_dataset(
     train=False
 )
 test_loader = torch.utils.data.DataLoader(
-    test_dataset, batch_size=8, shuffle=False, num_workers=6)
+    test_dataset, batch_size=4, shuffle=False, num_workers=6)
 
 try:
     os.makedirs(output_folder, exist_ok=True)
