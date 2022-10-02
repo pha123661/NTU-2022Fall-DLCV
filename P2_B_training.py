@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from P2_dataloader import p2_dataset
-from P2_models import createDeepLabv3
+from P2_models import DeepLabv3
 
 
 class FocalLoss(nn.Module):
@@ -71,7 +71,7 @@ valid_dataset = p2_dataset(
     train=True,
 )
 
-batch_size = 4
+batch_size = 8
 
 train_loader = DataLoader(
     dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
@@ -85,13 +85,13 @@ best_loss = 5.0
 ckpt_path = f'./P2_B_checkpoint'
 
 # model
-net = createDeepLabv3(n_classes=7, mode='resnet')
+net = DeepLabv3(n_classes=7, mode='resnet')
 net = net.to(device)
 net.train()
 loss_fn = FocalLoss()
 optim = torch.optim.SGD(net.parameters(), lr=lr / 10, weight_decay=1e-5)
-scheduler = torch.optim.lr_scheduler.OneCycleLR(
-    optim, max_lr=lr, steps_per_epoch=len(train_loader), epochs=epochs)
+scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+    optim, T_0=5, T_mult=2)
 
 if not os.path.isdir(ckpt_path):
     os.mkdir(ckpt_path)
@@ -106,8 +106,7 @@ for epoch in range(1, epochs + 1):
         loss = loss_fn(logits, y) + loss_fn(aux_logits, y)
         loss.backward()
         optim.step()
-        scheduler.step()
-
+    scheduler.step()
     net.eval()
     with torch.no_grad():
         va_loss = 0

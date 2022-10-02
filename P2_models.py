@@ -161,7 +161,7 @@ def FCN32s():
     return my_FCN32s()
 
 
-def createDeepLabv3(n_classes=7, mode='resnet'):
+def DeepLabv3(n_classes=7, mode='resnet'):
     if mode == 'resnet':
         model = torch.hub.load('pytorch/vision:v0.10.0',
                                'deeplabv3_resnet50', pretrained=True)
@@ -178,7 +178,7 @@ def createDeepLabv3(n_classes=7, mode='resnet'):
 
 
 if __name__ == '__main__':
-    model = createDeepLabv3(7)
+    model = DeepLabv3(7)
     model.train()
     print(model(torch.rand(3, 3, 512, 512))['aux'].shape)
 
