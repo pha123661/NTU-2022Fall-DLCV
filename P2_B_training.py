@@ -69,7 +69,7 @@ valid_dataset = p2_dataset(
     train=True,
 )
 
-batch_size = 8
+batch_size = 4
 
 train_loader = DataLoader(
     dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=6)
@@ -113,7 +113,8 @@ for epoch in range(1, epochs + 1):
             x, y = x.to(device), y.to(device)
             out = net(x)['out']
             pred = out.argmax(dim=1)
-            va_loss += nn.functional.cross_entropy(out, y).item()
+            va_loss += nn.functional.cross_entropy(out,
+                                                   y, ignore_index=6).item()
 
             pred = pred.detach().cpu().numpy().astype(np.int64)
             y = y.detach().cpu().numpy().astype(np.int64)
