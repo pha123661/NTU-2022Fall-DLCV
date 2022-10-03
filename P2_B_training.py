@@ -1,7 +1,4 @@
 import os
-from logging import LoggerAdapter
-from re import T
-from turtle import forward
 
 import numpy as np
 import torch
@@ -24,7 +21,7 @@ class FocalLoss(nn.Module):
         super().__init__()
         self.alpha = alpha
         self.gamma = gamma
-        self.CE = nn.CrossEntropyLoss(ignore_index=6)
+        self.CE = nn.CrossEntropyLoss(ignore_index=ignore_index)
 
     def forward(self, logits, labels):
         log_pt = -self.CE(logits, labels)
