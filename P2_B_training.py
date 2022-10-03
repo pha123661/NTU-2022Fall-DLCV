@@ -19,11 +19,12 @@ class FocalLoss(nn.Module):
         self,
         alpha=0.25,
         gamma=2,
+        ignore_index=6,
     ) -> None:
         super().__init__()
         self.alpha = alpha
         self.gamma = gamma
-        self.CE = nn.CrossEntropyLoss()
+        self.CE = nn.CrossEntropyLoss(ignore_index=6)
 
     def forward(self, logits, labels):
         log_pt = -self.CE(logits, labels)
