@@ -79,7 +79,7 @@ valid_loader = DataLoader(
 device = torch.device('cuda')
 epochs = 100
 lr = 0.03
-best_loss = 5.0
+best_mIoU = -1
 ckpt_path = f'./P2_B_checkpoint'
 
 # model
@@ -105,10 +105,12 @@ for epoch in range(1, epochs + 1):
         loss.backward()
         optim.step()
     scheduler.step()
+
     net.eval()
     with torch.no_grad():
         va_loss = 0
-        mIoUs = []
+        all_preds = []
+        all_gt = []
         for x, y in tqdm(valid_loader):
             x, y = x.to(device), y.to(device)
             out = net(x)['out']
@@ -118,15 +120,18 @@ for epoch in range(1, epochs + 1):
 
             pred = pred.detach().cpu().numpy().astype(np.int64)
             y = y.detach().cpu().numpy().astype(np.int64)
-            mIoUs.append(mean_iou_score(pred, y))
+            all_preds.append(pred)
+            all_gt.append(y)
 
         va_loss /= len(valid_loader)
-        acc = sum(mIoUs) / len(mIoUs)
+        mIoU = mean_iou_score(np.concatenate(
+            all_preds, axis=0), np.concatenate(all_gt, axis=0))
     net.train()
 
-    print(f"epoch {epoch}, mIoU = {acc}, va_loss = {va_loss}")
-    if va_loss <= best_loss:
-        best_loss = va_loss
+    print(f"epoch {epoch}, mIoU = {mIoU}, va_loss = {va_loss}")
+
+    if mIoU >= best_mIoU:
+        best_mIoU = mIoU
         torch.save(optim.state_dict(), os.path.join(
             ckpt_path, 'best_optimizer.pth'))
         torch.save(net.state_dict(), os.path.join(ckpt_path, 'best_model.pth'))
@@ -134,3 +139,5 @@ for epoch in range(1, epochs + 1):
 
     torch.save(net.state_dict(), os.path.join(
         ckpt_path, f'{epoch}_model.pth'))
+
+print(f'best mIoU: {mIoU}')
