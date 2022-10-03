@@ -60,5 +60,4 @@ for x, filenames in test_loader:
         x = x.to(device)
         out = net(x)['out']
     pred = out.argmax(dim=1)
-    print(filenames)
     pred2image(pred, filenames, output_folder)
