@@ -78,7 +78,7 @@ valid_loader = DataLoader(
 
 device = torch.device('cuda')
 epochs = 100
-lr = 0.03
+lr = 0.003
 best_mIoU = -1
 ckpt_path = f'./P2_B_checkpoint'
 
@@ -87,7 +87,7 @@ net = DeepLabv3(n_classes=7, mode='resnet')
 net = net.to(device)
 net.train()
 loss_fn = FocalLoss()
-optim = torch.optim.SGD(net.parameters(), lr=lr / 10, weight_decay=1e-5)
+optim = torch.optim.SGD(net.parameters(), lr=lr, weight_decay=1e-5)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
     optim, T_0=5, T_mult=2)
 
