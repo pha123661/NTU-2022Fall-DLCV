@@ -3,3 +3,4 @@ tb
 **checkpoint**
 *.jpg
 *.png
+*.pth
