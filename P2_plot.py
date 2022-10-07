@@ -40,8 +40,8 @@ def get_model(path):
 
 
 net_first = get_model('dlcv hw1 p2 plot weight/1_model.pth')
-net_mid = get_model('dlcv hw1 p2 plot weight/18_model.pth')
-net_last = get_model('dlcv hw1 p2 plot weight/36_model.pth')
+net_mid = get_model('dlcv hw1 p2 plot weight/50_model.pth')
+net_last = get_model('dlcv hw1 p2 plot weight/100_model.pth')
 
 input_folder = './p2 plot fig/'
 output_folders = ['./p2 plot fig/first/',
