@@ -78,7 +78,7 @@ valid_loader = DataLoader(
 
 device = torch.device('cuda')
 epochs = 100
-lr = 0.003
+lr = 0.1
 best_mIoU = -1
 ckpt_path = f'./P2_B_checkpoint'
 
@@ -88,8 +88,8 @@ net = net.to(device)
 net.train()
 loss_fn = FocalLoss()
 optim = torch.optim.SGD(net.parameters(), lr=lr, weight_decay=1e-5)
-scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-    optim, T_0=5, T_mult=2)
+scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    optim, max_lr=lr, steps_per_epoch=len(train_loader), epochs=epochs)
 
 if not os.path.isdir(ckpt_path):
     os.mkdir(ckpt_path)
@@ -104,7 +104,7 @@ for epoch in range(1, epochs + 1):
         loss = loss_fn(logits, y) + loss_fn(aux_logits, y)
         loss.backward()
         optim.step()
-    scheduler.step()
+        scheduler.step()
 
     net.eval()
     with torch.no_grad():
