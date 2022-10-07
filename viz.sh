@@ -1,3 +1,4 @@
+python3 P2_plot.py
 # 3 models
 for filename in "0013_sat" "0062_sat" "0104_sat"
 do
