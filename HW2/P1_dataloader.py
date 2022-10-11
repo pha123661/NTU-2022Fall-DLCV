@@ -40,4 +40,5 @@ if __name__ == '__main__':
 
     mean /= len(dataset)
     std /= len(dataset)
+    # tensor([0.5696, 0.4315, 0.3593]) tensor([0.2513, 0.2157, 0.1997])
     print(mean, std)
