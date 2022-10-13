@@ -189,7 +189,7 @@ class DDPM_framework(nn.Module):
 
     def forward(self, x, c):
         _ts = torch.randint(1, self.n_T, (x.shape[0], )).to(self.device)
-        noise = torch.randn(*x.shape)
+        noise = torch.randn(*x.shape, device=self.device)
 
         x_t = self.sqrtab[_ts, None, None, None] * x + \
             self.sqrtmab[_ts, None, None, None] * noise
@@ -213,7 +213,6 @@ class DDPM_framework(nn.Module):
 
         # history
         x_i_store = []
-        print()
         for i in range(self.n_T, 0, -1):
             t_is = torch.tensor([i / self.n_T]).to(device)
             t_is = t_is.repeat(n_sample, 1, 1, 1)
