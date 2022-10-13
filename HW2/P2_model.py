@@ -139,7 +139,7 @@ class Unet(nn.Module):
 
         dec1 = self.decode0(hidden_vec)
         dec2 = self.decode1(x=c_emb1 * dec1 + t_emb1, skip=enc2)
-        dec3 = self.decode2(x=c_emb2 * dec2, skip=enc1)
+        dec3 = self.decode2(x=c_emb2 * dec2 + t_emb2, skip=enc1)
         out = self.out(torch.cat((dec3, x), 1))
 
         return out
