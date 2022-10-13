@@ -88,3 +88,5 @@ for epoch in range(num_epochs):
         x_gen, x_gen_store = ddpm.sample(100, (3, 28, 28), device, guide_w=2)
         grid = make_grid(x_gen * -1 + 1, nrow=10)
         writer.add_image('Generated results', grid, epoch)
+
+    torch.save(ddpm.state_dict(), ckpt_path / f"{epoch}_ddpm.pth")
