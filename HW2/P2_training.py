@@ -41,7 +41,7 @@ num_epochs = 100
 n_T = 500
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 lr = 1e-4
-n_features = 256
+n_features = 128
 ckpt_path = Path('./P2_ckpt')
 tb_path = Path('./P2_tb')
 

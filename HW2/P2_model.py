@@ -200,6 +200,44 @@ class DDPM_framework(nn.Module):
 
         return self.loss_fn(noise, self.net(x_t, c, _ts / self.n_T, context_mask))
 
+    def class_gen(self, n_sample, size, device, class_idx, guide_w=0.5):
+        x_i = torch.randn(n_sample, *size).to(device)
+        c_i = torch.ones(n_sample, device=device,
+                         dtype=torch.int64) * class_idx
+
+        context_mask = torch.zeros(*c_i.shape).to(device)
+
+        c_i = c_i.repeat(2)
+        context_mask = context_mask.repeat(2)
+        context_mask[n_sample:] = 1
+
+        # history
+        x_i_store = []
+        for i in range(self.n_T, 0, -1):
+            t_is = torch.tensor([i / self.n_T]).to(device)
+            t_is = t_is.repeat(n_sample, 1, 1, 1)
+
+            # double batch
+            x_i = x_i.repeat(2, 1, 1, 1)
+            t_is = t_is.repeat(2, 1, 1, 1)
+
+            z = torch.randn(n_sample, *size).to(device) if i > 1 else 0
+
+            eps = self.net(x_i, c_i, t_is, context_mask)
+            eps1 = eps[:n_sample]
+            eps2 = eps[n_sample:]
+            eps = (1 + guide_w) * eps1 - guide_w * eps2
+            x_i = x_i[:n_sample]
+            x_i = (
+                self.oneover_sqrta[i] * (x_i - eps * self.mab_over_sqrtmab[i]) +
+                self.sqrt_beta_t[i] * z
+            )
+            if i % 20 == 0 or i == self.n_T or i < 8:
+                x_i_store.append(x_i.detach().cpu().numpy())
+
+        x_i_store = np.array(x_i_store)
+        return x_i, x_i_store
+
     def sample(self, n_sample, size, device, guide_w=0.0):
         x_i = torch.randn(n_sample, *size).to(device)
         c_i = torch.arange(0, 10).to(device)
