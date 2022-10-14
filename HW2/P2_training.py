@@ -84,11 +84,13 @@ for epoch in range(num_epochs):
 
     ddpm.eval()
     with torch.no_grad():
-        n_samples = 20
+        n_samples = 30
         for gw in [0, 0.5, 2]:
             x_gen, x_gen_store = ddpm.sample(
                 n_samples, (3, 28, 28), device, guide_w=gw)
             grid = make_grid(x_gen * -1 + 1, nrow=3)
             writer.add_image(f'DDPM results/w={gw:.1f}', grid, epoch)
+            grid = make_grid(x_gen, nrow=3)
+            writer.add_image(f'DDPM results wo inv/w={gw:.1f}', grid, epoch)
 
     torch.save(ddpm.state_dict(), ckpt_path / f"{epoch}_ddpm.pth")
