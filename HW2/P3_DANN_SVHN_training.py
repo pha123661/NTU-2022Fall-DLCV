@@ -1,4 +1,3 @@
-import math
 from itertools import chain
 from pathlib import Path
 
@@ -11,7 +10,7 @@ from torchvision import transforms
 from tqdm import tqdm
 
 from digit_dataloader import digit_dataset
-from P3_USPS_model import DomainClassifier, FeatureExtractor, LabelPredictor
+from P3_SVHN_model import DomainClassifier, FeatureExtractor, LabelPredictor
 
 
 # https://github.com/NaJaeMin92/pytorch_DANN
@@ -43,26 +42,26 @@ source_train_set = digit_dataset(
 )
 target_train_set = digit_dataset(
     # [0.2570, 0.2570, 0.2570], [0.3372, 0.3372, 0.3372]
-    root='hw2_data/digits/usps/data',
+    root='hw2_data/digits/svhn/data',
     transform=transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize([0.2573, 0.2573, 0.2573],
-                             [0.3373, 0.3373, 0.3373])
+        transforms.Normalize([0.4413, 0.4458, 0.4715],
+                             [0.1169, 0.1206, 0.1042])
     ]),
-    label_csv='hw2_data/digits/usps/train.csv'
+    label_csv='hw2_data/digits/svhn/train.csv'
 )
 target_val_set = digit_dataset(
     # [0.2570, 0.2570, 0.2570], [0.3372, 0.3372, 0.3372]
-    root='hw2_data/digits/usps/data',
+    root='hw2_data/digits/svhn/data',
     transform=transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize([0.2573, 0.2573, 0.2573],
-                             [0.3373, 0.3373, 0.3373])
+        transforms.Normalize([0.4413, 0.4458, 0.4715],
+                             [0.1169, 0.1206, 0.1042])
     ]),
-    label_csv='hw2_data/digits/usps/val.csv'
+    label_csv='hw2_data/digits/svhn/val.csv'
 )
 
-batch_size = 256
+batch_size = 512
 source_train_loader = DataLoader(
     source_train_set, batch_size, shuffle=True, num_workers=6)
 target_train_loader = DataLoader(
@@ -72,12 +71,9 @@ target_val_loader = DataLoader(
 
 target_train_loader = iter(cycle(target_train_loader))
 
-num_epochs = 300
-lr = 0.003
-gamma = 10
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-ckpt_path = Path('./P3_USPS_ckpt')
-tb_path = Path('./P3_USPS_tb')
+ckpt_path = Path('./P3_SVHN_ckpt')
+tb_path = Path('./P3_SVHN_tb')
 
 rm_tree(ckpt_path)
 rm_tree(tb_path)
@@ -87,15 +83,19 @@ tb_path.mkdir(exist_ok=True)
 
 writer = SummaryWriter(tb_path)
 
+num_epochs = 100
+lr = 0.01
+gamma = 10
+n_features = 256
 
-F = FeatureExtractor().to(device)
-L = LabelPredictor().to(device)
-D = DomainClassifier().to(device)
+F = FeatureExtractor(n_features=n_features).to(device)
+L = LabelPredictor(n_features=n_features).to(device)
+D = DomainClassifier(n_features=n_features).to(device)
 
 label_loss_fn = nn.CrossEntropyLoss()
-domain_loss_fn = nn.BCELoss()
-optim = torch.optim.Adam(
-    chain(F.parameters(), L.parameters(), D.parameters()), lr=lr)
+domain_loss_fn = nn.CrossEntropyLoss()
+optim = torch.optim.SGD(
+    chain(F.parameters(), L.parameters(), D.parameters()), lr=lr, momentum=0.9)
 
 current_step = 0
 total_steps = num_epochs * len(source_train_loader)
@@ -108,26 +108,29 @@ for epoch in range(num_epochs):
 
         # scheduling
         p = current_step / total_steps
-        lambda_ = 2.0 / (1.0 + math.exp(-gamma * p)) - 1
+        lambda_ = 2.0 / (1.0 + np.exp(-gamma * p)) - 1
         optim.param_groups[0]['lr'] = lr / (1.0 + gamma * p) ** 0.75
 
-        # label classification loss
+        # feature extraction
         source_feature = F(src_x)
+        target_feature = F(tgt_x)
+
+        # label classification loss
         source_logits = L(source_feature)
         label_loss = label_loss_fn(source_logits, src_y)
 
         # domain discriminator loss
-        all_x = torch.cat([src_x, tgt_x], dim=0)
-        all_feature = F(all_x)
-        domain_logits = D(all_feature, lambda_)
-        domain_logits = domain_logits.squeeze()
-        domain_labels = torch.cat([
-            # source=0
-            torch.zeros(src_x.shape[0], dtype=torch.float, device=device),
-            # target=1
-            torch.ones(tgt_x.shape[0], dtype=torch.float, device=device)
-        ], dim=0)
-        domain_loss = domain_loss_fn(domain_logits, domain_labels)
+        # source=1
+        source_domain_logit = D(source_feature, lambda_).squeeze()
+        source_domain_loss = domain_loss_fn(source_domain_logit, torch.zeros(
+            src_x.shape[0], dtype=torch.long, device=device))
+
+        # target=1
+        target_domain_logit = D(target_feature, lambda_).squeeze()
+        target_domain_loss = domain_loss_fn(target_domain_logit, torch.ones(
+            tgt_x.shape[0], dtype=torch.long, device=device))
+
+        domain_loss = source_domain_loss + target_domain_loss
 
         writer.add_scalars('training', {
                            'label_loss': label_loss, 'domain_loss': domain_loss}, global_step=current_step)
@@ -140,6 +143,8 @@ for epoch in range(num_epochs):
         current_step += 1
 
     # validation
+    for model in [F, L, D]:
+        model.eval()
     va_acc = 0
     for tgt_x, tgt_y in tqdm(target_val_loader):
         tgt_x = tgt_x.to(device)
@@ -149,6 +154,8 @@ for epoch in range(num_epochs):
             logits = L(F(tgt_x))
         pred = logits.argmax(-1).cpu().numpy()
         va_acc += np.sum((pred == tgt_y).astype(int)) / len(pred)
+    for model in [F, L, D]:
+        model.train()
     va_acc /= len(target_val_loader)
     writer.add_scalar('accuracy/validation', va_acc, global_step=current_step)
 
