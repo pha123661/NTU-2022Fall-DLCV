@@ -61,7 +61,7 @@ target_val_set = digit_dataset(
     label_csv='hw2_data/digits/svhn/val.csv'
 )
 
-batch_size = 512
+batch_size = 1024
 source_train_loader = DataLoader(
     source_train_set, batch_size, shuffle=True, num_workers=6)
 target_train_loader = DataLoader(
@@ -83,14 +83,13 @@ tb_path.mkdir(exist_ok=True)
 
 writer = SummaryWriter(tb_path)
 
-num_epochs = 100
-lr = 0.01
+num_epochs = 200
+lr = 0.1
 gamma = 10
-n_features = 256
 
-F = FeatureExtractor(n_features=n_features).to(device)
-L = LabelPredictor(n_features=n_features).to(device)
-D = DomainClassifier(n_features=n_features).to(device)
+F = FeatureExtractor().to(device)
+L = LabelPredictor().to(device)
+D = DomainClassifier().to(device)
 
 label_loss_fn = nn.CrossEntropyLoss()
 domain_loss_fn = nn.CrossEntropyLoss()
