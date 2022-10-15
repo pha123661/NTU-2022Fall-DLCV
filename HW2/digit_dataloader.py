@@ -32,7 +32,7 @@ class digit_dataset(Dataset):
                     self.Labels.append(int(row[1]))
 
     def __getitem__(self, idx):
-        img = Image.open(self.Image_names[idx])
+        img = Image.open(self.Image_names[idx]).convert('RGB')
         img = self.Transform(img)
         label = self.Labels[idx]
         return img, label
@@ -42,13 +42,21 @@ class digit_dataset(Dataset):
 
 
 if __name__ == '__main__':
+    # dataset = digit_dataset(
+    #     root='hw2_data/digits/mnistm/data',
+    #     transform=transforms.Compose([
+    #         transforms.ToTensor(),
+    #     ]),
+    #     label_csv=['hw2_data/digits/mnistm/train.csv',
+    #                'hw2_data/digits/mnistm/val.csv']
+    # )
     dataset = digit_dataset(
-        root='hw2_data/digits/mnistm/data',
+        root='hw2_data/digits/usps/data',
         transform=transforms.Compose([
             transforms.ToTensor(),
         ]),
-        label_csv=['hw2_data/digits/mnistm/train.csv',
-                   'hw2_data/digits/mnistm/val.csv']
+        label_csv=['hw2_data/digits/usps/train.csv',
+                   'hw2_data/digits/usps/val.csv']
     )
     print(len(dataset))
     mean = torch.zeros(3)
