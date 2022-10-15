@@ -9,6 +9,7 @@ from torchvision import transforms
 
 from digit_dataloader import digit_dataset
 from P3_SVHN_model import FeatureExtractor as SF
+from P3_SVHN_model import LabelPredictor as SL
 from P3_USPS_model import FeatureExtractor as UF
 
 # load dataset
@@ -55,7 +56,11 @@ USPS_val_loader = DataLoader(
 # SVHN
 device = 'cuda'
 net = SF().to(device)
+L = SL().to(device)
 net.load_state_dict(torch.load('P3_SVHN_ckpt/best_F.pth', map_location=device))
+L.load_state_dict(torch.load('P3_SVHN_ckpt/best_L.pth', map_location=device))
+net.eval()
+L.eval()
 
 all_feature = []
 all_label = []
@@ -64,6 +69,8 @@ for x, y in source_val_loader:
     x = x.to(device)
     with torch.no_grad():
         f = net(x)
+        f = L.l_clf[0](f)
+        f = L.l_clf[1](f)
     all_feature.append(f.cpu().numpy())
     all_label.append(y.cpu().numpy())
     all_domains.append(np.zeros((len(x),), dtype=np.int32))
@@ -72,6 +79,8 @@ for x, y in SVHN_val_loader:
     x = x.to(device)
     with torch.no_grad():
         f = net(x)
+        f = L.l_clf[0](f)
+        f = L.l_clf[1](f)
     all_feature.append(f.cpu().numpy())
     all_label.append(y.cpu().numpy())
     all_domains.append(np.ones((len(x),), dtype=np.int32))
