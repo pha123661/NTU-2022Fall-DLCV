@@ -10,7 +10,7 @@ class GRF(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        lambda_ = ctx.saved_variables
+        lambda_ = ctx.saved_variables[0]
         return grad_output.neg() * lambda_, None
 
 
@@ -56,12 +56,12 @@ class LabelPredictor(nn.Module):
             nn.ReLU(),
             nn.Linear(n_features // 2, n_features // 4),
             nn.ReLU(),
-            nn.Linear(n_features // 4, 1),
+            nn.Linear(n_features // 4, n_classes),
         )
 
     def forward(self, x):
         x = self.l_clf(x)
-        x = nn.functional.softmax(x)  # using BCEloss later
+        # x = nn.functional.softmax(x)  # using BCEloss later
         return x
 
 
@@ -84,7 +84,6 @@ class DomainClassifier(nn.Module):
     def forward(self, x, lambda_):
         x = GRF.apply(x, lambda_)
         x = self.d_clf(x)
-        x = nn.functional.softmax(x)
         return x
 
 

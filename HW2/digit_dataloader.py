@@ -1,5 +1,4 @@
 import csv
-import glob
 import os
 
 import torch
@@ -43,20 +42,28 @@ class digit_dataset(Dataset):
 
 if __name__ == '__main__':
     # dataset = digit_dataset(
+    #     # [0.4631, 0.4666, 0.4195], [0.1979, 0.1845, 0.2083]
     #     root='hw2_data/digits/mnistm/data',
     #     transform=transforms.Compose([
     #         transforms.ToTensor(),
     #     ]),
-    #     label_csv=['hw2_data/digits/mnistm/train.csv',
-    #                'hw2_data/digits/mnistm/val.csv']
+    #     label_csv='hw2_data/digits/mnistm/train.csv'
+    # )
+    # dataset = digit_dataset(
+    #     # [0.4413, 0.4458, 0.4715], [0.1169, 0.1206, 0.1042]
+    #     root='hw2_data/digits/svhn/data',
+    #     transform=transforms.Compose([
+    #         transforms.ToTensor(),
+    #     ]),
+    #     label_csv='hw2_data/digits/svhn/train.csv'
     # )
     dataset = digit_dataset(
+        # [0.2570, 0.2570, 0.2570], [0.3372, 0.3372, 0.3372]
         root='hw2_data/digits/usps/data',
         transform=transforms.Compose([
             transforms.ToTensor(),
         ]),
-        label_csv=['hw2_data/digits/usps/train.csv',
-                   'hw2_data/digits/usps/val.csv']
+        label_csv='hw2_data/digits/usps/train.csv'
     )
     print(len(dataset))
     mean = torch.zeros(3)
