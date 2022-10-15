@@ -10,47 +10,39 @@ from torchvision import transforms
 from torchvision.utils import make_grid, save_image
 from tqdm import tqdm
 
+from P1_A_model import DCGAN_D, DCGAN_G
 from P1_dataloader import p1_dataset
-from P1_model import DCGAN_D, DCGAN_G
 
-# def get_FID(device, weight, out_dir):
-#     state_1, state_2 = random.getstate(), torch.get_rng_state()
-#     random.seed(0)
-#     torch.manual_seed(0)
 
-#     batch_size = 100
-#     model = DCGAN_G().to(device)
-#     model.load_state_dict(torch.load(weight, map_location=device))
-
-#     idx = 0
-#     for _ in range(1000 // batch_size):
-#         with torch.no_grad():
-#             z = torch.randn(batch_size, 100, 1, 1, device=device)
-#             gen_imgs = model(z)
-#             for img in gen_imgs:
-#                 save_image(img, out_dir / f'{idx}.png', normalize=True)
-#                 idx += 1
-
-#     FID = fid_score.calculate_fid_given_paths(
-#         [str(out_dir), 'hw2_data/face/val'],
-#         batch_size=batch_size,
-#         device=device,
-#         dims=2048,
-#         num_workers=8,
-#     )
-
-#     random.setstate(state_1)
-#     torch.set_rng_state(state_2)
-#     return FID
+# https://github.com/LynnHo/DCGAN-LSGAN-WGAN-GP-DRAGAN-Pytorch
+def get_FID(device, generator, out_dir, eval_noise):
+    batch_size = 100
+    generator.eval()
+    idx = 0
+    with torch.no_grad():
+        gen_imgs = generator(eval_noise)
+        for img in gen_imgs:
+            save_image(img, out_dir / f'{idx}.png', normalize=True)
+            idx += 1
+    generator.train()
+    FID = fid_score.calculate_fid_given_paths(
+        [str(out_dir), 'hw2_data/face/val'],
+        batch_size=batch_size,
+        device=device,
+        dims=2048,
+        num_workers=8,
+    )
+    return FID
 
 
 def rm_tree(pth: Path):
-    for child in pth.iterdir():
-        if child.is_file():
-            child.unlink()
-        else:
-            rm_tree(child)
-    pth.rmdir()
+    if pth.is_dir():
+        for child in pth.iterdir():
+            if child.is_file():
+                child.unlink()
+            else:
+                rm_tree(child)
+        pth.rmdir()
 
 
 mean = [0.5696, 0.4315, 0.3593]  # calculated on training set
@@ -65,20 +57,21 @@ train_set = p1_dataset(
     ])
 )
 
-batch_size = 512
+batch_size = 4096
 train_loader = DataLoader(
     train_set, batch_size=batch_size, shuffle=True, num_workers=6)
 
 
-num_epochs = 20
-lr = 2e-4
-ckpt_path = Path('./P1_A_ckpt')
-tb_path = Path('./P1_A_tb')
+num_epochs = 150
+lr = 1e-4
+ckpt_path = Path('./P1_B_ckpt')
+tb_path = Path('./P1_B_tb')
+out_path = Path('./P1_B_out')
 
 rm_tree(ckpt_path)
 rm_tree(tb_path)
+rm_tree(out_path)
 
-plot_K_iters = 200
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 loss_fn = nn.BCELoss()  # take y as 1 or 0 <-> choosing logx or log(1-x) in BCE
@@ -93,12 +86,14 @@ writer = SummaryWriter(tb_path)
 
 # plot every K iterations
 plot_noise = torch.randn(64, 100, 1, 1, device=device)
+eval_noise = torch.randn(batch_size, 100, 1, 1, device=device)
 iters = 0
 ckpt_path.mkdir(exist_ok=True)
+out_path.mkdir(exist_ok=True)
+best_epoch = -1
 best_FID = 10e10
-best_ITER = -1
 for epoch in range(1, num_epochs + 1):
-    for real_imgs in train_loader:
+    for real_imgs in tqdm(train_loader):
         '''
         Update Discriminator:
         maximizes log(D(x)) + log(1 - D(G(z)))
@@ -153,23 +148,21 @@ for epoch in range(1, num_epochs + 1):
         writer.add_scalar('D/D(x)', L_D, global_step=iters)
         writer.add_scalar('D/D(G(z)) 1', L_G_1, global_step=iters)
         writer.add_scalar('D/D(G(z)) 2', L_G_2, global_step=iters)
-
-        if epoch > 1 and (iters % plot_K_iters) == 0:
-            with torch.no_grad():
-                plot_img = model_G(plot_noise).detach().cpu()
-                grid = make_grid(plot_img, padding=2, normalize=True)
-                writer.add_image('Generated results', grid, iters)
-            torch.save(model_G.state_dict(), ckpt_path / f"{iters}_G.pth")
-            torch.save(model_D.state_dict(), ckpt_path / f"{iters}_D.pth")
-            # FID = get_FID(device=device, weight=ckpt_path /
-            #               f"{iters}_G.pth", out_dir=Path('./P1_A_out'))
-            # if FID <= best_FID:
-            #     best_FID = FID
-            #     best_ITER = iters
-            #     print(f"[NEW] ITER {iters} BEST FID: {FID}")
-            # else:
-            #     print(f"[BAD] ITER {iters} FID: {FID}, BEST FID: {best_FID}")
-
         iters += 1
 
-print(f"[RST] iter {best_ITER}, best FID: {best_FID}")
+    with torch.no_grad():
+        plot_img = model_G(plot_noise).detach().cpu()
+        grid = make_grid(plot_img, padding=2, normalize=True)
+        writer.add_image('GAN results', grid, epoch)
+    torch.save(model_G.state_dict(), ckpt_path / f"{epoch}_G.pth")
+    torch.save(model_D.state_dict(), ckpt_path / f"{epoch}_D.pth")
+    FID = get_FID(device=device, generator=model_G,
+                  out_dir=out_path, eval_noise=eval_noise)
+    if FID <= best_FID:
+        best_FID = FID
+        best_epoch = epoch
+        print(f"[NEW] EPOCH {epoch} BEST FID: {FID}")
+    else:
+        print(f"[BAD] EPOCH {epoch} FID: {FID}, BEST FID: {best_FID}")
+
+print(f"[RST] EPOCH {best_epoch}, best FID: {best_FID}")

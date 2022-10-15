@@ -5,7 +5,7 @@ import random
 import torch
 from torchvision.utils import save_image
 
-from P1_model import DCGAN_G
+from P1_A_model import DCGAN_G
 
 
 def main(device, weight, out_dir):
