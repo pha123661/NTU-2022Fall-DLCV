@@ -14,6 +14,7 @@ from digit_dataloader import digit_dataset
 from P3_model import DomainClassifier, FeatureExtractor, LabelPredictor
 
 
+# https://github.com/NaJaeMin92/pytorch_DANN
 def rm_tree(pth: Path):
     if pth.is_dir():
         for child in pth.iterdir():
@@ -22,6 +23,12 @@ def rm_tree(pth: Path):
             else:
                 rm_tree(child)
         pth.rmdir()
+
+
+def cycle(iterable):
+    while True:
+        for x in iterable:
+            yield x
 
 
 source_train_set = digit_dataset(
@@ -63,8 +70,10 @@ target_train_loader = DataLoader(
 target_val_loader = DataLoader(
     target_val_set, 2 * batch_size, shuffle=False, num_workers=6)
 
+target_train_loader = iter(cycle(target_train_loader))
+
 num_epochs = 300
-lr = 0.01
+lr = 0.003
 gamma = 10
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 ckpt_path = Path('./P3_USPS_ckpt')
@@ -92,10 +101,10 @@ current_step = 0
 total_steps = num_epochs * len(source_train_loader)
 best_target_acc = 0.3
 for epoch in range(num_epochs):
-    for src_x, src_y in tqdm(source_train_loader):
-        tgt_x, _ = next(iter(target_train_loader))
-        src_x, tgt_x, src_y = src_x.to(
-            device), tgt_x.to(device), src_y.to(device)
+    for (src_x, src_y), (tgt_x, _) in tqdm(zip(source_train_loader, target_train_loader), total=len(source_train_loader)):
+        src_x = src_x.to(device, non_blocking=True)
+        src_y = src_y.to(device, non_blocking=True)
+        tgt_x = tgt_x.to(device, non_blocking=True)
 
         # scheduling
         p = current_step / total_steps
@@ -121,7 +130,7 @@ for epoch in range(num_epochs):
         domain_loss = domain_loss_fn(domain_logits, domain_labels)
 
         writer.add_scalars('training', {
-                           'label_loss': label_loss, 'domain_loss': domain_loss, 'lr': optim.param_groups[0]['lr']}, global_step=current_step)
+                           'label_loss': label_loss, 'domain_loss': domain_loss}, global_step=current_step)
 
         loss = label_loss + domain_loss
         loss.backward()

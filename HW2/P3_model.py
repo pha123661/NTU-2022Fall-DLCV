@@ -54,9 +54,7 @@ class LabelPredictor(nn.Module):
         self.l_clf = nn.Sequential(
             nn.Linear(n_features, n_features // 2),
             nn.ReLU(),
-            nn.Linear(n_features // 2, n_features // 4),
-            nn.ReLU(),
-            nn.Linear(n_features // 4, n_classes),
+            nn.Linear(n_features // 2, n_classes),
         )
 
     def forward(self, x):
