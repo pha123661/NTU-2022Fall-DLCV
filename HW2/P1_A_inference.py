@@ -30,16 +30,6 @@ def main(device, weight, out_dir):
             save_image(img, out_dir / f'{idx}.png', normalize=True)
             idx += 1
 
-    # FID = fid_score.calculate_fid_given_paths(
-    #     [str(out_dir), 'hw2_data/face/val'],
-    #     batch_size=batch_size,
-    #     device=device,
-    #     dims=2048,
-    #     num_workers=8,
-    # )
-    # print(f"FID: {FID}")
-    # return FID
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
