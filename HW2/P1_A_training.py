@@ -57,16 +57,16 @@ train_set = p1_dataset(
     ])
 )
 
-batch_size = 4096
+batch_size = 2048
 train_loader = DataLoader(
     train_set, batch_size=batch_size, shuffle=True, num_workers=6)
 
 
-num_epochs = 150
+num_epochs = 1500
 lr = 1e-4
-ckpt_path = Path('./P1_B_ckpt')
-tb_path = Path('./P1_B_tb')
-out_path = Path('./P1_B_out')
+ckpt_path = Path('./P1_A_ckpt')
+tb_path = Path('./P1_A_tb')
+out_path = Path('./P1_A_out')
 
 rm_tree(ckpt_path)
 rm_tree(tb_path)
