@@ -45,8 +45,9 @@ def rm_tree(pth: Path):
         pth.rmdir()
 
 
-mean = [0.5696, 0.4315, 0.3593]  # calculated on training set
-std = [0.2513, 0.2157, 0.1997]
+# [0.5696, 0.4315, 0.3593]  # calculated on training set
+mean = [0.5, 0.5, 0.5]
+std = [0.5, 0.5, 0.5]
 
 train_set = p1_dataset(
     root='./hw2_data/face/train',
@@ -61,13 +62,13 @@ UnNormalize = transforms.Normalize(
     std=[1 / s for s in std],
 )
 
-batch_size = 2048
+batch_size = 128
 train_loader = DataLoader(
     train_set, batch_size=batch_size, shuffle=True, num_workers=6)
 
 
-num_epochs = 1500
-lr = 1e-4
+num_epochs = 150
+lr = 2e-4
 ckpt_path = Path('./P1_A_ckpt')
 tb_path = Path('./P1_A_tb')
 out_path = Path('./P1_A_out')
@@ -159,16 +160,16 @@ for epoch in range(1, num_epochs + 1):
         plot_img = UnNormalize(plot_img)
         grid = make_grid(plot_img, padding=2)
         writer.add_image('GAN results', grid, epoch)
-    if epoch >= 100:
-        FID = get_FID(device=device, generator=model_G,
-                    out_dir=out_path, eval_noise=eval_noise)
-        if FID <= best_FID:
-            best_FID = FID
-            best_epoch = epoch
-            print(f"[NEW] EPOCH {epoch} BEST FID: {FID}")
-            torch.save(model_G.state_dict(), ckpt_path / "best_G.pth")
-            torch.save(model_D.state_dict(), ckpt_path / "best_D.pth")
-        else:
-            print(f"[BAD] EPOCH {epoch} FID: {FID}, BEST FID: {best_FID}")
+
+    FID = get_FID(device=device, generator=model_G,
+                  out_dir=out_path, eval_noise=eval_noise)
+    if FID <= best_FID:
+        best_FID = FID
+        best_epoch = epoch
+        print(f"[NEW] EPOCH {epoch} BEST FID: {FID}")
+        torch.save(model_G.state_dict(), ckpt_path / "best_G.pth")
+        torch.save(model_D.state_dict(), ckpt_path / "best_D.pth")
+    else:
+        print(f"[BAD] EPOCH {epoch} FID: {FID}, BEST FID: {best_FID}")
 
 print(f"[RST] EPOCH {best_epoch}, best FID: {best_FID}")
