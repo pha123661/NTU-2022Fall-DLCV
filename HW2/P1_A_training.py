@@ -20,8 +20,9 @@ def get_FID(device, generator, out_dir, eval_noise):
     idx = 0
     with torch.no_grad():
         gen_imgs = generator(eval_noise)
+        gen_imgs = UnNormalize(gen_imgs)
         for img in gen_imgs:
-            save_image(img, out_dir / f'{idx}.png', normalize=True)
+            save_image(img, out_dir / f'{idx}.png')
             idx += 1
     generator.train()
     FID = fid_score.calculate_fid_given_paths(
@@ -54,6 +55,10 @@ train_set = p1_dataset(
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
     ])
+)
+UnNormalize = transforms.Normalize(
+    mean=[-u / s for u, s in zip(mean, std)],
+    std=[1 / s for s in std],
 )
 
 batch_size = 2048
@@ -151,17 +156,19 @@ for epoch in range(1, num_epochs + 1):
 
     with torch.no_grad():
         plot_img = model_G(plot_noise).detach().cpu()
-        grid = make_grid(plot_img, padding=2, normalize=True)
+        plot_img = UnNormalize(plot_img)
+        grid = make_grid(plot_img, padding=2)
         writer.add_image('GAN results', grid, epoch)
-    torch.save(model_G.state_dict(), ckpt_path / f"{epoch}_G.pth")
-    torch.save(model_D.state_dict(), ckpt_path / f"{epoch}_D.pth")
-    FID = get_FID(device=device, generator=model_G,
-                  out_dir=out_path, eval_noise=eval_noise)
-    if FID <= best_FID:
-        best_FID = FID
-        best_epoch = epoch
-        print(f"[NEW] EPOCH {epoch} BEST FID: {FID}")
-    else:
-        print(f"[BAD] EPOCH {epoch} FID: {FID}, BEST FID: {best_FID}")
+    if epoch >= 100:
+        FID = get_FID(device=device, generator=model_G,
+                    out_dir=out_path, eval_noise=eval_noise)
+        if FID <= best_FID:
+            best_FID = FID
+            best_epoch = epoch
+            print(f"[NEW] EPOCH {epoch} BEST FID: {FID}")
+            torch.save(model_G.state_dict(), ckpt_path / "best_G.pth")
+            torch.save(model_D.state_dict(), ckpt_path / "best_D.pth")
+        else:
+            print(f"[BAD] EPOCH {epoch} FID: {FID}, BEST FID: {best_FID}")
 
 print(f"[RST] EPOCH {best_epoch}, best FID: {best_FID}")
