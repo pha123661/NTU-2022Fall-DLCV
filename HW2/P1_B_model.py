@@ -3,81 +3,60 @@ from torch import nn
 
 
 class Generator(nn.Module):
-    def __init__(self, latent_size=128, out_chans=3, n_featuremap=64, n_upsamplings=4) -> None:
+    def __init__(self, latent_size=128, n_featuremap=64) -> None:
         super().__init__()
 
-        def UpsampleLayer(in_dim, out_dim, kernel_size=4, stride=2, padding=1):
+        def UpsampleLayer(in_dim, out_dim):
             return nn.Sequential(
-                nn.ConvTranspose2d(in_dim, out_dim, kernel_size, stride=stride,
-                                   padding=padding, bias=False),
+                nn.ConvTranspose2d(in_dim, out_dim, 5, 2,
+                                   padding=2, output_padding=1, bias=False),
                 nn.BatchNorm2d(out_dim),
                 nn.ReLU()
             )
 
-        Layers = []
-
-        # 1: 1x1 -> 4x4
-        d = min(n_featuremap * 2 ** (n_upsamplings - 1), n_featuremap * 8)
-        Layers.append(
-            UpsampleLayer(latent_size, d, kernel_size=4, stride=1, padding=0)
+        self.l1 = nn.Sequential(
+            nn.Linear(latent_size, n_featuremap * 8 * 4 * 4, bias=False),
+            nn.BatchNorm1d(n_featuremap * 8 * 4 * 4),
+            nn.ReLU()
+        )
+        self.l2_5 = nn.Sequential(
+            UpsampleLayer(n_featuremap * 8, n_featuremap * 4),
+            UpsampleLayer(n_featuremap * 4, n_featuremap * 2),
+            UpsampleLayer(n_featuremap * 2, n_featuremap),
+            nn.ConvTranspose2d(n_featuremap, 3, 5, 2,
+                               padding=2, output_padding=1),
+            nn.Tanh()
         )
 
-        # 2: upsamplings, 4x4 -> 8x8 -> 16x16 -> ...
-        for i in range(n_upsamplings - 1):
-            d_last = d
-            d = min(n_featuremap * 2 **
-                    (n_upsamplings - 2 - i), n_featuremap * 8)
-            Layers.append(
-                UpsampleLayer(d_last, d, kernel_size=4, stride=2, padding=1)
-            )
-
-        Layers.append(
-            nn.ConvTranspose2d(d, out_chans, kernel_size=4,
-                               stride=2, padding=1)
-        )
-        Layers.append(nn.Tanh())
-
-        self.gen = nn.Sequential(*Layers)
-
-    def forward(self, z):
-        x = self.gen(z)
-        return x
+    def forward(self, x):
+        x = x.reshape(x.size(0), -1)
+        y = self.l1(x)
+        y = y.view(y.size(0), -1, 4, 4)
+        y = self.l2_5(y)
+        return y
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_chans=3, n_featuremap=64, n_downsamplings=4) -> None:
+    def __init__(self, in_chans=3, n_featuremap=64) -> None:
         super().__init__()
 
-        def DownsampleLayer(in_dim, out_dim, kernel_size=4, stride=2, padding=1):
+        def conv_ln_lrelu(in_dim, out_dim):
             return nn.Sequential(
-                nn.Conv2d(in_dim, out_dim, kernel_size, stride=stride,
-                          padding=padding, bias=False),
-                # gradient penalty is not compatible with batch norm
-                nn.GroupNorm(1, out_dim),  # layer norm
+                nn.Conv2d(in_dim, out_dim, 5, 2, 2),
+                nn.InstanceNorm2d(out_dim, affine=True),
                 nn.LeakyReLU(0.2)
             )
 
-        layers = []
-
-        # 1: downsamplings, ... -> 16x16 -> 8x8 -> 4x4
-        d = n_featuremap
-        layers.append(nn.Conv2d(in_chans, d,
-                      kernel_size=4, stride=2, padding=1))
-        layers.append(nn.LeakyReLU(0.2))
-
-        for i in range(n_downsamplings - 1):
-            d_last = d
-            d = min(n_featuremap * 2 ** (i + 1), n_featuremap * 8)
-            layers.append(DownsampleLayer(
-                d_last, d, kernel_size=4, stride=2, padding=1))
-
-        # 2: logit
-        layers.append(nn.Conv2d(d, 1, kernel_size=4, stride=1, padding=0))
-
-        self.net = nn.Sequential(*layers)
+        self.ls = nn.Sequential(
+            nn.Conv2d(in_chans, n_featuremap, 5, 2, 2), nn.LeakyReLU(0.2),
+            conv_ln_lrelu(n_featuremap, n_featuremap * 2),
+            conv_ln_lrelu(n_featuremap * 2, n_featuremap * 4),
+            conv_ln_lrelu(n_featuremap * 4, n_featuremap * 8),
+            nn.Conv2d(n_featuremap * 8, 1, 4))
 
     def forward(self, x):
-        y = self.net(x)
+        y = self.ls(x)
+        y = y.view(-1)
         return y
 
     def calc_gp(self, real, fake):

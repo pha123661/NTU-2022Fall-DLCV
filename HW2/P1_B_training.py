@@ -21,7 +21,7 @@ def get_FID(device, generator, out_dir, eval_noise):
     idx = 0
     with torch.no_grad():
         gen_imgs = generator(eval_noise).cpu()
-        gen_imgs = invTrans(gen_imgs)
+        gen_imgs = UnNormalize(gen_imgs)
         for img in gen_imgs:
             save_image(img, out_dir / f'{idx}.png')
             idx += 1
@@ -48,7 +48,7 @@ def rm_tree(pth: Path):
 
 mean = [0.5696, 0.4315, 0.3593]  # calculated on training set
 std = [0.2513, 0.2157, 0.1997]
-invTrans = transforms.Normalize(
+UnNormalize = transforms.Normalize(
     mean=[-u / s for u, s in zip(mean, std)],
     std=[1 / s for s in std],
 )
@@ -93,7 +93,7 @@ ckpt_path.mkdir(exist_ok=True)
 out_path.mkdir(exist_ok=True)
 best_epoch = -1
 best_FID = 10e10
-
+iters = 0
 for epoch in range(num_epochs):
     for x_real in tqdm(train_loader):
         x_real = x_real.to(device, non_blocking=True)
@@ -114,11 +114,12 @@ for epoch in range(num_epochs):
         D_optimizer.zero_grad()
 
         writer.add_scalar('Train/W_dis', -real_D_loss -
-                          fake_D_loss, global_step=epoch)
+                          fake_D_loss, global_step=iters)
+        writer.add_scalar('Train/GP', 10 * gp, global_step=iters)
         writer.add_scalars('Train', {
             'Real center': -real_D_loss,
             'Fake center': fake_D_loss,
-        }, global_step=epoch)
+        }, global_step=iters)
 
         # Train G
         fake_D_logits = D(x_fake)
@@ -128,9 +129,11 @@ for epoch in range(num_epochs):
         G_optimizer.step()
         G_optimizer.zero_grad()
 
+        iters += 1
+
     with torch.no_grad():
         plot_img = G(plot_noise).detach().cpu()
-        plot_img = invTrans(plot_img)
+        plot_img = UnNormalize(plot_img)
         grid = make_grid(plot_img, padding=2)
         writer.add_image('GAN results', grid, epoch)
 
