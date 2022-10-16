@@ -12,6 +12,8 @@ from tqdm import tqdm
 from P1_B_model import DCGAN_G, SNGAN_D
 from P1_dataloader import p1_dataset
 
+FID_cool_down = 10
+
 
 def get_FID(device, generator, out_dir, eval_noise):
     batch_size = 100
@@ -23,16 +25,23 @@ def get_FID(device, generator, out_dir, eval_noise):
         for img in gen_imgs:
             save_image(img, out_dir / f'{idx}.png')
             idx += 1
-        writer.add_image('GAN results', gen_imgs, epoch)
+        writer.add_images('GAN results', gen_imgs, epoch)
     generator.train()
-    FID = fid_score.calculate_fid_given_paths(
-        [str(out_dir), 'hw2_data/face/val'],
-        batch_size=batch_size,
-        device=device,
-        dims=2048,
-        num_workers=8,
-    )
-    return FID
+    global FID_cool_down
+    if FID_cool_down > 0:
+        FID_cool_down -= 1
+        return 10e10
+    else:
+        FID = fid_score.calculate_fid_given_paths(
+            [str(out_dir), 'hw2_data/face/val'],
+            batch_size=gen_imgs.size(0),
+            device=device,
+            dims=2048,
+            num_workers=8,
+        )
+        if FID > 50:
+            FID_cool_down += 10
+        return FID
 
 
 def rm_tree(pth: Path):
@@ -45,7 +54,6 @@ def rm_tree(pth: Path):
         pth.rmdir()
 
 
-# [0.5696, 0.4315, 0.3593]  # calculated on training set
 mean = [0.5, 0.5, 0.5]
 std = [0.5, 0.5, 0.5]
 
