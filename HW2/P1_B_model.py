@@ -2,7 +2,46 @@ import torch
 from torch import nn
 
 
+def DCGAN_init(layer):
+    if isinstance(layer, (nn.ConvTranspose2d, nn.Conv2d, nn.Linear)):
+        nn.init.normal_(layer.weight.data, 0, 0.02)
+    elif isinstance(layer, (nn.BatchNorm2d, nn.BatchNorm1d, nn.InstanceNorm2d, )):
+        nn.init.normal_(layer.weight.data, 1.0, 0.02)
+        nn.init.constant_(layer.bias.data, 0)
+    elif isinstance(layer, (nn.LeakyReLU, nn.ReLU, nn.Tanh, nn.Sigmoid, nn.Sequential, Generator, Discriminator)):
+        pass
+    else:
+        raise ModuleNotFoundError(
+            f"initialize Module error: {type(layer)}: {layer}")
+
+
 class Generator(nn.Module):
+    # def __init__(self, latent_size=128, num_map=64) -> None:
+    #     super().__init__()
+    #     self.net = nn.Sequential(
+    #         nn.ConvTranspose2d(latent_size, num_map * 8, 4, 1, 0, bias=False),
+    #         nn.BatchNorm2d(num_map * 8),
+    #         nn.ReLU(True),
+
+    #         nn.ConvTranspose2d(num_map * 8, num_map * 4, 4, 2, 1, bias=False),
+    #         nn.BatchNorm2d(num_map * 4),
+    #         nn.ReLU(True),
+
+    #         nn.ConvTranspose2d(num_map * 4, num_map * 2, 4, 2, 1, bias=False),
+    #         nn.BatchNorm2d(num_map * 2),
+    #         nn.ReLU(True),
+
+    #         nn.ConvTranspose2d(num_map * 2, num_map, 4, 2, 1, bias=False),
+    #         nn.BatchNorm2d(num_map),
+    #         nn.ReLU(True),
+
+    #         nn.ConvTranspose2d(num_map, 3, 4, 2, 1, bias=False),
+    #         nn.Tanh()
+    #     )
+    #     self.apply(DCGAN_init)
+
+    # def forward(self, z):
+    #     return self.net(z)
     def __init__(self, latent_size=128, n_featuremap=64) -> None:
         super().__init__()
 
@@ -37,6 +76,32 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
+    # def __init__(self, num_map=64) -> None:
+    #     super().__init__()
+    #     self.net = nn.Sequential(
+    #         nn.Conv2d(3, num_map, 4, 2, 1, bias=False),
+
+    #         nn.Conv2d(num_map, num_map * 2, 4, 2, 1, bias=False),
+    #         nn.InstanceNorm2d(num_map * 2, affine=True),
+    #         nn.LeakyReLU(0.2),
+
+    #         nn.Conv2d(num_map * 2, num_map * 4, 4, 2, 1, bias=False),
+    #         nn.InstanceNorm2d(num_map * 4, affine=True),
+    #         nn.LeakyReLU(0.2),
+
+    #         nn.Conv2d(num_map * 4, num_map * 8, 4, 2, 1, bias=False),
+    #         nn.InstanceNorm2d(num_map * 8, affine=True),
+    #         nn.LeakyReLU(0.2),
+
+    #         # global conv
+    #         nn.Conv2d(num_map * 8, 1, 4, 1, 0, bias=False),
+    #     )
+
+    #     self.apply(DCGAN_init)
+
+    # def forward(self, img):
+    #     return self.net(img)
+
     def __init__(self, in_chans=3, n_featuremap=64) -> None:
         super().__init__()
 
@@ -85,5 +150,8 @@ class Discriminator(nn.Module):
 
 
 if __name__ == '__main__':
-    print(Generator())
-    print(Discriminator())
+    print(g := Generator())
+    g.apply(DCGAN_init)
+    print(d := Discriminator())
+    d.apply(DCGAN_init)
+    print(d(torch.rand(64, 3, 64, 64)).shape)
