@@ -14,7 +14,6 @@ from P1_A_model import DCGAN_D, DCGAN_G
 from P1_dataloader import p1_dataset
 
 
-# https://github.com/LynnHo/DCGAN-LSGAN-WGAN-GP-DRAGAN-Pytorch
 def get_FID(device, generator, out_dir, eval_noise):
     batch_size = 100
     generator.eval()
