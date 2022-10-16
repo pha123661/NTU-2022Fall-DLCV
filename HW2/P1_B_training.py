@@ -67,12 +67,14 @@ batch_size = 128
 train_loader = DataLoader(
     train_set, batch_size=batch_size, shuffle=True, num_workers=6)
 
-num_epochs = 150
+num_epochs = 9999
 num_critic = 5
 lr = 1e-5
 z_dim = 128
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if device == torch.device('cuda'):
+    torch.backends.cudnn.benchmark = True
 
 G = Generator(latent_size=z_dim, n_featuremap=128).to(device)
 D = Discriminator(n_featuremap=128).to(device)
