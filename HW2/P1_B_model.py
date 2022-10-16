@@ -16,32 +16,6 @@ def DCGAN_init(layer):
 
 
 class Generator(nn.Module):
-    # def __init__(self, latent_size=128, num_map=64) -> None:
-    #     super().__init__()
-    #     self.net = nn.Sequential(
-    #         nn.ConvTranspose2d(latent_size, num_map * 8, 4, 1, 0, bias=False),
-    #         nn.BatchNorm2d(num_map * 8),
-    #         nn.ReLU(True),
-
-    #         nn.ConvTranspose2d(num_map * 8, num_map * 4, 4, 2, 1, bias=False),
-    #         nn.BatchNorm2d(num_map * 4),
-    #         nn.ReLU(True),
-
-    #         nn.ConvTranspose2d(num_map * 4, num_map * 2, 4, 2, 1, bias=False),
-    #         nn.BatchNorm2d(num_map * 2),
-    #         nn.ReLU(True),
-
-    #         nn.ConvTranspose2d(num_map * 2, num_map, 4, 2, 1, bias=False),
-    #         nn.BatchNorm2d(num_map),
-    #         nn.ReLU(True),
-
-    #         nn.ConvTranspose2d(num_map, 3, 4, 2, 1, bias=False),
-    #         nn.Tanh()
-    #     )
-    #     self.apply(DCGAN_init)
-
-    # def forward(self, z):
-    #     return self.net(z)
     def __init__(self, latent_size=128, n_featuremap=64) -> None:
         super().__init__()
 
@@ -50,13 +24,13 @@ class Generator(nn.Module):
                 nn.ConvTranspose2d(in_dim, out_dim, 5, 2,
                                    padding=2, output_padding=1, bias=False),
                 nn.BatchNorm2d(out_dim),
-                nn.ReLU()
+                nn.ReLU(True),
             )
 
         self.l1 = nn.Sequential(
             nn.Linear(latent_size, n_featuremap * 8 * 4 * 4, bias=False),
             nn.BatchNorm1d(n_featuremap * 8 * 4 * 4),
-            nn.ReLU()
+            nn.ReLU(True),
         )
         self.l2_5 = nn.Sequential(
             UpsampleLayer(n_featuremap * 8, n_featuremap * 4),
@@ -67,6 +41,8 @@ class Generator(nn.Module):
             nn.Tanh()
         )
 
+        self.init_weight()
+
     def forward(self, x):
         x = x.reshape(x.size(0), -1)
         y = self.l1(x)
@@ -74,34 +50,17 @@ class Generator(nn.Module):
         y = self.l2_5(y)
         return y
 
+    def init_weight(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+                nn.init.kaiming_normal_(
+                    m.weight, mode='fan_out', nonlinearity='leaky_relu')
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
+                m.weight.data.normal_(1.0, 0.02)
+                m.bias.data.fill_(0)
+
 
 class Discriminator(nn.Module):
-    # def __init__(self, num_map=64) -> None:
-    #     super().__init__()
-    #     self.net = nn.Sequential(
-    #         nn.Conv2d(3, num_map, 4, 2, 1, bias=False),
-
-    #         nn.Conv2d(num_map, num_map * 2, 4, 2, 1, bias=False),
-    #         nn.InstanceNorm2d(num_map * 2, affine=True),
-    #         nn.LeakyReLU(0.2),
-
-    #         nn.Conv2d(num_map * 2, num_map * 4, 4, 2, 1, bias=False),
-    #         nn.InstanceNorm2d(num_map * 4, affine=True),
-    #         nn.LeakyReLU(0.2),
-
-    #         nn.Conv2d(num_map * 4, num_map * 8, 4, 2, 1, bias=False),
-    #         nn.InstanceNorm2d(num_map * 8, affine=True),
-    #         nn.LeakyReLU(0.2),
-
-    #         # global conv
-    #         nn.Conv2d(num_map * 8, 1, 4, 1, 0, bias=False),
-    #     )
-
-    #     self.apply(DCGAN_init)
-
-    # def forward(self, img):
-    #     return self.net(img)
-
     def __init__(self, in_chans=3, n_featuremap=64) -> None:
         super().__init__()
 
@@ -113,11 +72,14 @@ class Discriminator(nn.Module):
             )
 
         self.ls = nn.Sequential(
-            nn.Conv2d(in_chans, n_featuremap, 5, 2, 2), nn.LeakyReLU(0.2),
+            conv_ln_lrelu(in_chans, n_featuremap),
             conv_ln_lrelu(n_featuremap, n_featuremap * 2),
             conv_ln_lrelu(n_featuremap * 2, n_featuremap * 4),
             conv_ln_lrelu(n_featuremap * 4, n_featuremap * 8),
-            nn.Conv2d(n_featuremap * 8, 1, 4))
+            nn.Conv2d(n_featuremap * 8, 1, 4)
+        )
+
+        self.init_weight()
 
     def forward(self, x):
         y = self.ls(x)
@@ -148,10 +110,16 @@ class Discriminator(nn.Module):
         gp = penalty(grad)
         return gp
 
+    def init_weight(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+                nn.init.kaiming_normal_(
+                    m.weight, mode='fan_out', nonlinearity='leaky_relu')
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
+                m.weight.data.normal_(1.0, 0.02)
+                m.bias.data.fill_(0)
+
 
 if __name__ == '__main__':
-    print(g := Generator())
-    g.apply(DCGAN_init)
-    print(d := Discriminator())
-    d.apply(DCGAN_init)
+    d = Discriminator()
     print(d(torch.rand(64, 3, 64, 64)).shape)

@@ -17,7 +17,6 @@ from P1_dataloader import p1_dataset
 # https://github.com/LynnHo/DCGAN-LSGAN-WGAN-GP-DRAGAN-Pytorch
 def get_FID(device, generator, out_dir, eval_noise):
     batch_size = 100
-    generator.eval()
     idx = 0
     with torch.no_grad():
         gen_imgs = generator(eval_noise).cpu()
@@ -25,7 +24,9 @@ def get_FID(device, generator, out_dir, eval_noise):
         for img in gen_imgs:
             save_image(img, out_dir / f'{idx}.png')
             idx += 1
-    generator.train()
+    writer.add_images('GAN results', gen_imgs, epoch)
+    if epoch <= 60:
+        return 10e10
     FID = fid_score.calculate_fid_given_paths(
         [str(out_dir), 'hw2_data/face/val'],
         batch_size=batch_size,
@@ -46,8 +47,8 @@ def rm_tree(pth: Path):
         pth.rmdir()
 
 
-mean = [0.5696, 0.4315, 0.3593]  # calculated on training set
-std = [0.2513, 0.2157, 0.1997]
+mean = [0.5, 0.5, 0.5]  # [0.5696, 0.4315, 0.3593]
+std = [0.5, 0.5, 0.5]  # [0.2513, 0.2157, 0.1997]
 UnNormalize = transforms.Normalize(
     mean=[-u / s for u, s in zip(mean, std)],
     std=[1 / s for s in std],
@@ -62,14 +63,14 @@ train_set = p1_dataset(
     ])
 )
 
-batch_size = 64
+batch_size = 128
 train_loader = DataLoader(
     train_set, batch_size=batch_size, shuffle=True, num_workers=6)
 
-num_epochs = 500
+num_epochs = 150
 num_critic = 5
-lr = 2e-4
-z_dim = 128
+lr = 1e-4
+z_dim = 512
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -78,9 +79,8 @@ D = Discriminator().to(device)
 G_optimizer = torch.optim.Adam(G.parameters(), lr=lr, betas=(0.5, 0.999))
 D_optimizer = torch.optim.Adam(D.parameters(), lr=lr, betas=(0.5, 0.999))
 
-# plot every epoch
-plot_noise = torch.randn(64, z_dim, 1, 1, device=device)
-eval_noise = torch.randn(batch_size, z_dim, 1, 1, device=device)
+
+eval_noise = torch.randn(64, z_dim, 1, 1, device=device)
 
 
 ckpt_path = Path('./P1_B_ckpt')
@@ -98,22 +98,24 @@ iters = 0
 for epoch in range(num_epochs):
     for x_real in tqdm(train_loader):
         x_real = x_real.to(device, non_blocking=True)
+        iters += 1
 
         # Train D
+        D_optimizer.zero_grad()
         z = torch.rand(x_real.shape[0], z_dim, 1, 1, device=device)
         x_fake = G(z)
         real_D_logits = D(x_real)
-        fake_D_logits = D(x_fake.detach())  # Detach since only updating D
+        real_D_logits = D(x_real)
+        # Detach since only updating D
+        fake_D_logits = D(x_fake.detach())
 
         real_D_loss = -real_D_logits.mean()  # maximize real
         fake_D_loss = fake_D_logits.mean()  # minimize fake
         gp = D.calc_gp(x_real, x_fake)
         D_loss = (real_D_loss + fake_D_loss) + 10 * gp
 
-        D_optimizer.zero_grad()
         D_loss.backward()
         D_optimizer.step()
-
         writer.add_scalar('Train/W_dis', -real_D_loss -
                           fake_D_loss, global_step=iters)  # W_dis = real_center - fake_center
         writer.add_scalar('Train/GP', 10 * gp, global_step=iters)
@@ -121,38 +123,27 @@ for epoch in range(num_epochs):
             'Real_center': -real_D_loss,
             'Fake_center': fake_D_loss,
         }, global_step=iters)
-        iters += 1
 
-        # only train G per num_critic
-        if iters % num_critic != 0:
-            continue
+        if iters % num_critic == 0:
+            # Train G
+            G_optimizer.zero_grad()
+            z = torch.rand(x_real.shape[0], z_dim, 1, 1, device=device)
+            x_fake = G(z)
+            fake_D_logits = D(x_fake)
+            G_loss = -fake_D_logits.mean()  # maximize fake
 
-        # Train G
-        z = torch.rand(x_real.shape[0], z_dim, 1, 1, device=device)
-        x_fake = G(z)
-        fake_D_logits = D(x_fake)
-        G_loss = -fake_D_logits.mean()  # maximize fake
+            G_loss.backward()
+            G_optimizer.step()
 
-        G_optimizer.zero_grad()
-        G_loss.backward()
-        G_optimizer.step()
-
-    with torch.no_grad():
-        plot_img = G(plot_noise).detach().cpu()
-        plot_img = UnNormalize(plot_img)
-        grid = make_grid(plot_img, padding=2)
-        writer.add_image('GAN results', grid, epoch)
-
-    if epoch >= 100:
-        FID = get_FID(device=device, generator=G,
-                      out_dir=out_path, eval_noise=eval_noise)
-        if FID <= best_FID:
-            best_FID = FID
-            best_epoch = epoch
-            torch.save(G.state_dict(), ckpt_path / f"best_G.pth")
-            torch.save(G.state_dict(), ckpt_path / f"best_D.pth")
-            print(f"[NEW] EPOCH {epoch} BEST FID: {FID}")
-        else:
-            print(f"[BAD] EPOCH {epoch} FID: {FID}, BEST FID: {best_FID}")
+    FID = get_FID(device=device, generator=G,
+                  out_dir=out_path, eval_noise=eval_noise)
+    if FID < best_FID:
+        best_FID = FID
+        best_epoch = epoch
+        torch.save(G.state_dict(), ckpt_path / f"best_G.pth")
+        torch.save(G.state_dict(), ckpt_path / f"best_D.pth")
+        print(f"[NEW] EPOCH {epoch} BEST FID: {FID}")
+    else:
+        print(f"[BAD] EPOCH {epoch} FID: {FID}, BEST FID: {best_FID}")
 
 print(f"[RST] EPOCH {best_epoch}, best FID: {best_FID}")
