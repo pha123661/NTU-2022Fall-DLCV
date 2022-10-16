@@ -29,7 +29,7 @@ def get_FID(device, generator, out_dir, eval_noise):
         return 10e10
     FID = fid_score.calculate_fid_given_paths(
         [str(out_dir), 'hw2_data/face/val'],
-        batch_size=batch_size,
+        batch_size=eval_noise.size(0),
         device=device,
         dims=2048,
         num_workers=8,
@@ -69,17 +69,20 @@ train_loader = DataLoader(
 
 num_epochs = 150
 num_critic = 5
-lr = 1e-4
-z_dim = 512
+lr = 1e-5
+z_dim = 128
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-G = Generator(latent_size=z_dim).to(device)
-D = Discriminator().to(device)
+G = Generator(latent_size=z_dim, n_featuremap=128).to(device)
+D = Discriminator(n_featuremap=128).to(device)
 G_optimizer = torch.optim.Adam(G.parameters(), lr=lr, betas=(0.5, 0.999))
 D_optimizer = torch.optim.Adam(D.parameters(), lr=lr, betas=(0.5, 0.999))
 
-
+print(
+    f"G #param: {sum(p.numel() for p in G.parameters() if p.requires_grad) / 10e6}M")
+print(
+    f"D #param: {sum(p.numel() for p in D.parameters() if p.requires_grad) / 10e6}M")
 eval_noise = torch.randn(64, z_dim, 1, 1, device=device)
 
 

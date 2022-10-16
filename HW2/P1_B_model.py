@@ -41,8 +41,6 @@ class Generator(nn.Module):
             nn.Tanh()
         )
 
-        self.init_weight()
-
     def forward(self, x):
         x = x.reshape(x.size(0), -1)
         y = self.l1(x)
@@ -50,21 +48,12 @@ class Generator(nn.Module):
         y = self.l2_5(y)
         return y
 
-    def init_weight(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
-                nn.init.kaiming_normal_(
-                    m.weight, mode='fan_out', nonlinearity='leaky_relu')
-            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
-                m.weight.data.normal_(1.0, 0.02)
-                m.bias.data.fill_(0)
-
 
 class Discriminator(nn.Module):
     def __init__(self, in_chans=3, n_featuremap=64) -> None:
         super().__init__()
 
-        def conv_ln_lrelu(in_dim, out_dim):
+        def DownsampleLayer(in_dim, out_dim):
             return nn.Sequential(
                 nn.Conv2d(in_dim, out_dim, 5, 2, 2),
                 nn.InstanceNorm2d(out_dim, affine=True),
@@ -72,14 +61,12 @@ class Discriminator(nn.Module):
             )
 
         self.ls = nn.Sequential(
-            conv_ln_lrelu(in_chans, n_featuremap),
-            conv_ln_lrelu(n_featuremap, n_featuremap * 2),
-            conv_ln_lrelu(n_featuremap * 2, n_featuremap * 4),
-            conv_ln_lrelu(n_featuremap * 4, n_featuremap * 8),
+            DownsampleLayer(in_chans, n_featuremap),
+            DownsampleLayer(n_featuremap, n_featuremap * 2),
+            DownsampleLayer(n_featuremap * 2, n_featuremap * 4),
+            DownsampleLayer(n_featuremap * 4, n_featuremap * 8),
             nn.Conv2d(n_featuremap * 8, 1, 4)
         )
-
-        self.init_weight()
 
     def forward(self, x):
         y = self.ls(x)
@@ -109,15 +96,6 @@ class Discriminator(nn.Module):
             logits, x, grad_outputs=torch.ones_like(logits), create_graph=True)[0]
         gp = penalty(grad)
         return gp
-
-    def init_weight(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
-                nn.init.kaiming_normal_(
-                    m.weight, mode='fan_out', nonlinearity='leaky_relu')
-            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
-                m.weight.data.normal_(1.0, 0.02)
-                m.bias.data.fill_(0)
 
 
 if __name__ == '__main__':
