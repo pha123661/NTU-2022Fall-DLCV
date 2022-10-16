@@ -62,17 +62,18 @@ train_set = p1_dataset(
     ])
 )
 
-batch_size = 2048
+batch_size = 64
 train_loader = DataLoader(
     train_set, batch_size=batch_size, shuffle=True, num_workers=6)
 
-num_epochs = 1500
+num_epochs = 500
+num_critic = 5
 lr = 2e-4
 z_dim = 128
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-G = Generator(latent_size=z_dim, n_featuremap=128).to(device)
+G = Generator(latent_size=z_dim).to(device)
 D = Discriminator().to(device)
 G_optimizer = torch.optim.Adam(G.parameters(), lr=lr, betas=(0.5, 0.999))
 D_optimizer = torch.optim.Adam(D.parameters(), lr=lr, betas=(0.5, 0.999))
@@ -97,10 +98,10 @@ iters = 0
 for epoch in range(num_epochs):
     for x_real in tqdm(train_loader):
         x_real = x_real.to(device, non_blocking=True)
-        z = torch.rand(x_real.shape[0], z_dim, 1, 1, device=device)
-        x_fake = G(z)
 
         # Train D
+        z = torch.rand(x_real.shape[0], z_dim, 1, 1, device=device)
+        x_fake = G(z)
         real_D_logits = D(x_real)
         fake_D_logits = D(x_fake.detach())  # Detach since only updating D
 
@@ -109,27 +110,32 @@ for epoch in range(num_epochs):
         gp = D.calc_gp(x_real, x_fake)
         D_loss = (real_D_loss + fake_D_loss) + 10 * gp
 
+        D_optimizer.zero_grad()
         D_loss.backward()
         D_optimizer.step()
-        D_optimizer.zero_grad()
 
         writer.add_scalar('Train/W_dis', -real_D_loss -
-                          fake_D_loss, global_step=iters)
+                          fake_D_loss, global_step=iters)  # W_dis = real_center - fake_center
         writer.add_scalar('Train/GP', 10 * gp, global_step=iters)
         writer.add_scalars('Train', {
-            'Real center': -real_D_loss,
-            'Fake center': fake_D_loss,
+            'Real_center': -real_D_loss,
+            'Fake_center': fake_D_loss,
         }, global_step=iters)
+        iters += 1
+
+        # only train G per num_critic
+        if iters % num_critic != 0:
+            continue
 
         # Train G
+        z = torch.rand(x_real.shape[0], z_dim, 1, 1, device=device)
+        x_fake = G(z)
         fake_D_logits = D(x_fake)
         G_loss = -fake_D_logits.mean()  # maximize fake
 
+        G_optimizer.zero_grad()
         G_loss.backward()
         G_optimizer.step()
-        G_optimizer.zero_grad()
-
-        iters += 1
 
     with torch.no_grad():
         plot_img = G(plot_noise).detach().cpu()
