@@ -20,9 +20,10 @@ def get_FID(device, generator, out_dir, eval_noise):
     generator.eval()
     idx = 0
     with torch.no_grad():
-        gen_imgs = generator(eval_noise)
+        gen_imgs = generator(eval_noise).cpu()
+        gen_imgs = invTrans(gen_imgs)
         for img in gen_imgs:
-            save_image(img, out_dir / f'{idx}.png', normalize=True)
+            save_image(img, out_dir / f'{idx}.png')
             idx += 1
     generator.train()
     FID = fid_score.calculate_fid_given_paths(
@@ -47,6 +48,10 @@ def rm_tree(pth: Path):
 
 mean = [0.5696, 0.4315, 0.3593]  # calculated on training set
 std = [0.2513, 0.2157, 0.1997]
+invTrans = transforms.Normalize(
+    mean=[-u / s for u, s in zip(mean, std)],
+    std=[1 / s for s in std],
+)
 
 train_set = p1_dataset(
     root='./hw2_data/face/train',
@@ -63,7 +68,7 @@ train_loader = DataLoader(
 
 num_epochs = 1500
 num_TrainD = 1
-lr = 2e-4
+lr = 2e-3
 z_dim = 128
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -111,9 +116,9 @@ for epoch in range(num_epochs):
         D_optimizer.zero_grad()
 
         count_D += 1
-
-        writer.add_scalars('training', {
-            'W_dis': fake_D_loss - real_D_loss,
+        writer.add_scalar('Train/W_dis', fake_D_loss +
+                          real_D_loss, global_step=epoch)
+        writer.add_scalars('Train', {
             'Real center': real_D_loss,
             'Fake center': fake_D_loss,
         }, global_step=epoch)
@@ -130,15 +135,16 @@ for epoch in range(num_epochs):
 
     with torch.no_grad():
         plot_img = G(plot_noise).detach().cpu()
-        grid = make_grid(plot_img, padding=2, normalize=True)
+        plot_img = invTrans(plot_img)
+        grid = make_grid(plot_img, padding=2)
         writer.add_image('GAN results', grid, epoch)
-    torch.save(G.state_dict(), ckpt_path / f"{epoch}_G.pth")
-    torch.save(G.state_dict(), ckpt_path / f"{epoch}_D.pth")
     FID = get_FID(device=device, generator=G,
                   out_dir=out_path, eval_noise=eval_noise)
     if FID <= best_FID:
         best_FID = FID
         best_epoch = epoch
+        torch.save(G.state_dict(), ckpt_path / f"best_G.pth")
+        torch.save(G.state_dict(), ckpt_path / f"best_D.pth")
         print(f"[NEW] EPOCH {epoch} BEST FID: {FID}")
     else:
         print(f"[BAD] EPOCH {epoch} FID: {FID}, BEST FID: {best_FID}")
