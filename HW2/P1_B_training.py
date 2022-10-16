@@ -67,13 +67,12 @@ train_loader = DataLoader(
     train_set, batch_size=batch_size, shuffle=True, num_workers=6)
 
 num_epochs = 1500
-num_TrainD = 1
-lr = 2e-3
+lr = 2e-4
 z_dim = 128
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-G = Generator(latent_size=z_dim).to(device)
+G = Generator(latent_size=z_dim, n_featuremap=128).to(device)
 D = Discriminator().to(device)
 G_optimizer = torch.optim.Adam(G.parameters(), lr=lr, betas=(0.5, 0.999))
 D_optimizer = torch.optim.Adam(D.parameters(), lr=lr, betas=(0.5, 0.999))
@@ -94,7 +93,6 @@ ckpt_path.mkdir(exist_ok=True)
 out_path.mkdir(exist_ok=True)
 best_epoch = -1
 best_FID = 10e10
-count_D = 0
 
 for epoch in range(num_epochs):
     for x_real in tqdm(train_loader):
@@ -106,8 +104,8 @@ for epoch in range(num_epochs):
         real_D_logits = D(x_real)
         fake_D_logits = D(x_fake.detach())  # Detach since only updating D
 
-        real_D_loss = -real_D_logits.mean()
-        fake_D_loss = fake_D_logits.mean()
+        real_D_loss = -real_D_logits.mean()  # maximize real
+        fake_D_loss = fake_D_logits.mean()  # minimize fake
         gp = D.calc_gp(x_real, x_fake)
         D_loss = (real_D_loss + fake_D_loss) + 10 * gp
 
@@ -115,19 +113,16 @@ for epoch in range(num_epochs):
         D_optimizer.step()
         D_optimizer.zero_grad()
 
-        count_D += 1
-        writer.add_scalar('Train/W_dis', fake_D_loss +
-                          real_D_loss, global_step=epoch)
+        writer.add_scalar('Train/W_dis', -real_D_loss -
+                          fake_D_loss, global_step=epoch)
         writer.add_scalars('Train', {
-            'Real center': real_D_loss,
+            'Real center': -real_D_loss,
             'Fake center': fake_D_loss,
         }, global_step=epoch)
 
         # Train G
-        if count_D % num_TrainD != 0:
-            continue
         fake_D_logits = D(x_fake)
-        G_loss = -fake_D_logits.mean()
+        G_loss = -fake_D_logits.mean()  # maximize fake
 
         G_loss.backward()
         G_optimizer.step()
@@ -138,15 +133,17 @@ for epoch in range(num_epochs):
         plot_img = invTrans(plot_img)
         grid = make_grid(plot_img, padding=2)
         writer.add_image('GAN results', grid, epoch)
-    FID = get_FID(device=device, generator=G,
-                  out_dir=out_path, eval_noise=eval_noise)
-    if FID <= best_FID:
-        best_FID = FID
-        best_epoch = epoch
-        torch.save(G.state_dict(), ckpt_path / f"best_G.pth")
-        torch.save(G.state_dict(), ckpt_path / f"best_D.pth")
-        print(f"[NEW] EPOCH {epoch} BEST FID: {FID}")
-    else:
-        print(f"[BAD] EPOCH {epoch} FID: {FID}, BEST FID: {best_FID}")
+
+    if epoch >= 100:
+        FID = get_FID(device=device, generator=G,
+                      out_dir=out_path, eval_noise=eval_noise)
+        if FID <= best_FID:
+            best_FID = FID
+            best_epoch = epoch
+            torch.save(G.state_dict(), ckpt_path / f"best_G.pth")
+            torch.save(G.state_dict(), ckpt_path / f"best_D.pth")
+            print(f"[NEW] EPOCH {epoch} BEST FID: {FID}")
+        else:
+            print(f"[BAD] EPOCH {epoch} FID: {FID}, BEST FID: {best_FID}")
 
 print(f"[RST] EPOCH {best_epoch}, best FID: {best_FID}")

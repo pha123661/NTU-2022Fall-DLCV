@@ -82,18 +82,18 @@ class Discriminator(nn.Module):
 
     def calc_gp(self, real, fake):
         def get_sample(real, fake):
-            # DRAGAN sampling, fake is less usefull
-            beta = torch.rand_like(real)
-            fake = real + 0.5 * real.std() * beta
+            # # DRAGAN sampling, fake is less usefull
+            # beta = torch.rand_like(real)
+            # fake = real + 0.5 * real.std() * beta
 
             shape = [real.size(0)] + [1] * (real.dim() - 1)
             alpha = torch.rand(shape, device=real.device)
             sample = real + alpha * (fake - real)
             return sample
 
-        def lipschitz_penalty(grad):
+        def penalty(grad):
             grad_norm = grad.reshape(grad.size(0), -1).norm(p=2, dim=1)
-            gp = (torch.max(torch.zeros_like(grad_norm), grad_norm - 1)**2).mean()
+            gp = ((grad_norm - 1)**2).mean()
             return gp
 
         x = get_sample(real, fake).detach()
@@ -101,5 +101,10 @@ class Discriminator(nn.Module):
         logits = self(x)
         grad = torch.autograd.grad(
             logits, x, grad_outputs=torch.ones_like(logits), create_graph=True)[0]
-        gp = lipschitz_penalty(grad)
+        gp = penalty(grad)
         return gp
+
+
+if __name__ == '__main__':
+    print(Generator())
+    print(Discriminator())
