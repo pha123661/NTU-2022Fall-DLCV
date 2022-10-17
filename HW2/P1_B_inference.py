@@ -3,31 +3,40 @@ import pathlib
 import random
 
 import torch
+from torchvision import transforms
 from torchvision.utils import save_image
 
-from P1_B_model import Generator
+from P1_B_model import DCGAN_G
 
-# python3 P1_A_inference.py  -w ./P1_B_ckpt/best_G.pth
+# python3 P1_B_inference.py  -w ./P1_B_ckpt/best_G.pth
 # pytorch-fid ./P1_B_out/ ./hw2_data/face/val/
 # python3 face_recog.py --image_dir ./P1_B_out
 
 
 def main(device, weight, out_dir):
-    # 7: 28.793507172455804, 90.90
-    seed = 7
+    # FID = 25.9896166834331, ACC = 91.100%
+    seed = 10
     random.seed(seed)
     torch.manual_seed(seed)
+    mean = [0.5, 0.5, 0.5]
+    std = [0.5, 0.5, 0.5]
+    UnNormalize = transforms.Normalize(
+        mean=[-u / s for u, s in zip(mean, std)],
+        std=[1 / s for s in std],
+    )
 
     batch_size = 100
-    model = Generator(n_featuremap=128).to(device)
+    model = DCGAN_G().to(device)
     model.load_state_dict(torch.load(weight, map_location=device))
 
     idx = 0
     for _ in range(1000 // batch_size):
-        z = torch.randn(batch_size, 128, 1, 1, device=device)
-        gen_imgs = model(z)
+        z = torch.randn(batch_size, 100, 1, 1, device=device)
+        with torch.no_grad():
+            gen_imgs = model(z)
+        gen_imgs = UnNormalize(gen_imgs)
         for img in gen_imgs:
-            save_image(img, out_dir / f'{idx}.png', normalize=True)
+            save_image(img, out_dir / f'{idx}.png')
             idx += 1
 
 
