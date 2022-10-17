@@ -15,8 +15,7 @@ from P1_dataloader import p1_dataset
 FID_cool_down = 10
 
 
-def get_FID(device, generator, out_dir, eval_noise):
-    batch_size = 100
+def CallBack(device, generator, out_dir, eval_noise):
     generator.eval()
     idx = 0
     with torch.no_grad():
@@ -27,21 +26,22 @@ def get_FID(device, generator, out_dir, eval_noise):
             idx += 1
         writer.add_images('GAN results', gen_imgs, epoch)
     generator.train()
+
     global FID_cool_down
     if FID_cool_down > 0:
         FID_cool_down -= 1
-        return 10e10
-    else:
-        FID = fid_score.calculate_fid_given_paths(
-            [str(out_dir), 'hw2_data/face/val'],
-            batch_size=gen_imgs.size(0),
-            device=device,
-            dims=2048,
-            num_workers=8,
-        )
-        if FID > 50:
-            FID_cool_down += 10
-        return FID
+        return -1
+
+    FID = fid_score.calculate_fid_given_paths(
+        [str(out_dir), 'hw2_data/face/val'],
+        batch_size=gen_imgs.size(0),
+        device=device,
+        dims=2048,
+        num_workers=8,
+    )
+    if FID > 50:
+        FID_cool_down += 10
+    return FID
 
 
 def rm_tree(pth: Path):
@@ -75,7 +75,7 @@ train_loader = DataLoader(
     train_set, batch_size=batch_size, shuffle=True, num_workers=6)
 
 
-num_epochs = 150
+num_epochs = 99999
 lr = 2e-4
 ckpt_path = Path('./P1_B_ckpt')
 tb_path = Path('./P1_B_tb')
@@ -154,8 +154,11 @@ for epoch in range(1, num_epochs + 1):
 
         iters += 1
 
-    FID = get_FID(device=device, generator=model_G,
-                  out_dir=out_path, eval_noise=eval_noise)
+    FID = CallBack(device=device, generator=model_G,
+                   out_dir=out_path, eval_noise=eval_noise)
+    if FID == -1:
+        continue
+    writer.add_scalar('FID', FID, global_step=epoch)
     if FID <= best_FID:
         best_FID = FID
         best_epoch = epoch
@@ -163,6 +166,7 @@ for epoch in range(1, num_epochs + 1):
         torch.save(model_G.state_dict(), ckpt_path / "best_G.pth")
         torch.save(model_D.state_dict(), ckpt_path / "best_D.pth")
     else:
-        print(f"[BAD] EPOCH {epoch} FID: {FID}, BEST FID: {best_FID}")
+        print(
+            f"EPOCH {epoch} FID: {FID}, BEST FID: {best_FID} @ EPOCH {best_epoch}")
 
-print(f"[RST] EPOCH {best_epoch}, best FID: {best_FID}")
+print(f"[RST] best FID: {best_FID} @ EPOCH {best_epoch}")
