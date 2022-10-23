@@ -11,7 +11,10 @@ random.seed(0)
 torch.manual_seed(0)
 
 out_dir = Path(sys.argv[1])
-out_dir.mkdir(exist_ok=True)
+try:
+    out_dir.mkdir(exist_ok=True, parents=True)
+except:
+    pass
 ckpt_dir = Path('./P2_ckpt/98_ddpm.pth')
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
