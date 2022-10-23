@@ -16,13 +16,10 @@ from P3_USPS_model import LabelPredictor as UL
 
 class ImageFolderTestPNGDataset(Dataset):
     def __init__(self, path, transform):
-        self.img_dir = path
-
+        path = pathlib.Path(path)
         self.data = []
         for img in path.glob("*"):
             if img.is_file():
-                if 'x' in str(img.name):
-                    print(img)
                 self.data.append(img)
 
         self.transform = transform
@@ -51,7 +48,7 @@ def main(args):
         transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean, std)
-        ])
+        ]),
     )
     test_loader = DataLoader(dataset, batch_size=64,
                              shuffle=False, num_workers=6)
@@ -83,11 +80,9 @@ def main(args):
 
         with torch.no_grad():
             logits = L(F(tgt_x))
-        pred = logits.argmax(-1).cpu().numpy()
-        all_preds.append(pred)
+        pred = logits.argmax(-1).cpu().tolist()
+        all_preds.extend(pred)
         all_names.extend(names)
-
-    all_preds = np.concatenate(all_preds).tolist()
 
     with open(args.out_csv, 'w', newline='') as file:
         writer = csv.writer(file)
@@ -95,20 +90,22 @@ def main(args):
         for data in zip(all_names, all_preds):
             writer.writerow(data)
 
-    # test validation
-    cor = 0
-    total = 0
-    with open('hw2_data/digits/svhn/val.csv', 'r') as file:
-        reader = csv.reader(file)
-        next(iter(reader))  # ignore first line
-        for row in reader:
-            name, label = row[0], int(row[1])
-
-            idx = all_names.index(name)
-            if label == all_preds[idx]:
-                cor += 1
-            total += 1
-    print(cor / total)
+    # validation result
+    try:
+        if args.do_eval:
+            cor = 0
+            total = 0
+            with open(f'hw2_data/digits/{"usps" if USPS else "svhn"}/val.csv', 'r') as file:
+                reader = csv.reader(file)
+                next(iter(reader))  # ignore first line
+                for row in reader:
+                    name, gt = row[0], int(row[1])
+                    if gt == all_preds[all_names.index(name)]:
+                        cor += 1
+                    total += 1
+            print(cor / total)
+    except Exception as e:
+        print(e)
 
 
 def parse_args():
@@ -142,6 +139,10 @@ def parse_args():
         help="device",
         type=torch.device,
         default='cuda' if torch.cuda.is_available() else 'cpu',
+    )
+    parser.add_argument(
+        "-v", "--do_eval",
+        action='store_true',
     )
     return parser.parse_args()
 
