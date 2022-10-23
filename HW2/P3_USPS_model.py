@@ -15,51 +15,46 @@ class GRF(torch.autograd.Function):
 
 
 class FeatureExtractor(nn.Module):
-    def __init__(self, in_chans=3, n_features=512) -> None:
+    def __init__(self, in_chans=3) -> None:
         super().__init__()
-        self.n_features = n_features
         self.conv = nn.Sequential(
-            nn.Conv2d(in_chans, 64, 3, padding=1),
+            nn.Conv2d(in_chans, 64, kernel_size=4),
             nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=3, stride=2),
 
-            nn.Conv2d(64, 128, 3, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, kernel_size=5),
+            nn.BatchNorm2d(64),
+            nn.Dropout2d(),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=3, stride=2),
 
-            nn.Conv2d(128, 256, 3, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
-
-            nn.Conv2d(256, 256, 3, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
-
-            nn.Conv2d(256, n_features, 3, padding=1),
-            nn.BatchNorm2d(n_features),
-            nn.ReLU(inplace=True),
-
-            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Conv2d(64, 128, kernel_size=3),
         )
 
     def forward(self, x):
         feature = self.conv(x)
-        feature = feature.reshape(-1, 512)
+        feature = feature.reshape(-1, 128)
         return feature
 
 
 class LabelPredictor(nn.Module):
-    def __init__(self, n_features=512, n_classes=10) -> None:
+    def __init__(self, n_classes=10) -> None:
         super().__init__()
         self.l_clf = nn.Sequential(
-            nn.Linear(n_features, n_features // 2),
+            nn.Linear(128, 1024),
+            nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Linear(n_features // 2, n_classes),
+
+            nn.Linear(1024, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+
+            nn.Linear(256, n_classes),
         )
 
     def forward(self, x):
         x = self.l_clf(x)
-        # x = nn.functional.softmax(x)  # using BCEloss later
         return x
 
 
@@ -68,15 +63,18 @@ class DomainClassifier(nn.Module):
     A Binary classifier
     '''
 
-    def __init__(self, n_features=512) -> None:
+    def __init__(self) -> None:
         super().__init__()
         self.d_clf = nn.Sequential(
-            nn.Linear(n_features, n_features // 2),
-            nn.LeakyReLU(0.2),
-            nn.Linear(n_features // 2, n_features // 4),
-            nn.LeakyReLU(0.2),
-            nn.Linear(n_features // 4, 1),
-            nn.Sigmoid(),
+            nn.Linear(128, 1024),
+            nn.BatchNorm1d(1024),
+            nn.ReLU(),
+
+            nn.Linear(1024, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+
+            nn.Linear(256, 1),
         )
 
     def forward(self, x, lambda_):
