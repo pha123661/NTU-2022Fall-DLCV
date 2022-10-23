@@ -93,7 +93,7 @@ L = LabelPredictor().to(device)
 D = DomainClassifier().to(device)
 
 label_loss_fn = nn.CrossEntropyLoss()
-domain_loss_fn = nn.BCELoss()
+domain_loss_fn = nn.BCEWithLogitsLoss()
 optim = torch.optim.Adam(
     chain(F.parameters(), L.parameters(), D.parameters()), lr=lr)
 
@@ -140,6 +140,8 @@ for epoch in range(num_epochs):
         current_step += 1
 
     # validation
+    for model in [F, L, D]:
+        model.eval()
     va_acc = 0
     for tgt_x, tgt_y in tqdm(target_val_loader):
         tgt_x = tgt_x.to(device)
@@ -148,8 +150,10 @@ for epoch in range(num_epochs):
         with torch.no_grad():
             logits = L(F(tgt_x))
         pred = logits.argmax(-1).cpu().numpy()
-        va_acc += np.sum((pred == tgt_y).astype(int)) / len(pred)
+        va_acc += np.mean((pred == tgt_y).astype(int))
     va_acc /= len(target_val_loader)
+    for model in [F, L, D]:
+        model.train()
     writer.add_scalar('accuracy/validation', va_acc, global_step=current_step)
 
     print(f"epoch: {epoch}, va_acc: {va_acc}")
