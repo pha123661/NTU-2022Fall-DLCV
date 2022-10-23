@@ -152,7 +152,7 @@ for epoch in range(num_epochs):
         with torch.no_grad():
             logits = L(F(tgt_x))
         pred = logits.argmax(-1).cpu().numpy()
-        va_acc += np.sum((pred == tgt_y).astype(int)) / len(pred)
+        va_acc += np.mean((pred == tgt_y).astype(int))
     for model in [F, L, D]:
         model.train()
     va_acc /= len(target_val_loader)
