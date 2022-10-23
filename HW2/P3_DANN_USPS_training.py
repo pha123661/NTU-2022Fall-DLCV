@@ -73,7 +73,7 @@ target_val_loader = DataLoader(
 target_train_loader = iter(cycle(target_train_loader))
 
 num_epochs = 300
-lr = 0.003
+lr = 0.0003
 gamma = 10
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 ckpt_path = Path('./P3_USPS_ckpt')
