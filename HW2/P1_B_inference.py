@@ -65,5 +65,8 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
-    args.out_dir.mkdir(exist_ok=True)
+    try:
+        args.out_dir.mkdir(exist_ok=True, parents=True)
+    except:
+        pass
     main(args.device, args.weight, args.out_dir)
