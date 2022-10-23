@@ -74,7 +74,7 @@ class DomainClassifier(nn.Module):
             nn.BatchNorm1d(256),
             nn.ReLU(),
 
-            nn.Linear(256, 2),
+            nn.Linear(256, 1),
         )
 
     def forward(self, x, lambda_):

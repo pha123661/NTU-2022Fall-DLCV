@@ -84,7 +84,7 @@ tb_path.mkdir(exist_ok=True)
 writer = SummaryWriter(tb_path)
 
 num_epochs = 200
-lr = 0.1
+lr = 0.003
 gamma = 10
 
 F = FeatureExtractor().to(device)
@@ -92,7 +92,7 @@ L = LabelPredictor().to(device)
 D = DomainClassifier().to(device)
 
 label_loss_fn = nn.CrossEntropyLoss()
-domain_loss_fn = nn.CrossEntropyLoss()
+domain_loss_fn = nn.BCEWithLogitsLoss()
 optim = torch.optim.SGD(
     chain(F.parameters(), L.parameters(), D.parameters()), lr=lr, momentum=0.9)
 
@@ -122,12 +122,12 @@ for epoch in range(num_epochs):
         # source=1
         source_domain_logit = D(source_feature, lambda_).squeeze()
         source_domain_loss = domain_loss_fn(source_domain_logit, torch.zeros(
-            src_x.shape[0], dtype=torch.long, device=device))
+            src_x.shape[0], dtype=torch.float, device=device))
 
         # target=1
         target_domain_logit = D(target_feature, lambda_).squeeze()
         target_domain_loss = domain_loss_fn(target_domain_logit, torch.ones(
-            tgt_x.shape[0], dtype=torch.long, device=device))
+            tgt_x.shape[0], dtype=torch.float, device=device))
 
         domain_loss = source_domain_loss + target_domain_loss
 
