@@ -1,0 +1,12 @@
+imageio==2.21.3
+matplotlib==3.6.1
+numpy==1.23.4
+Pillow==9.2.0
+scipy==1.9.1
+opencv-python==4.6.0.66
+tokenizers==0.13.1
+pycocotools==2.0.5
+timm==0.6.11
+torch==1.12.1
+torchvision==0.13.1
+gdown==4.5.3
