@@ -20,7 +20,7 @@ def parse():
                         default='./output_p1/pred.csv')
     parser.add_argument('--device', type=torch.device,
                         default='cuda' if torch.cuda.is_available() else 'cpu')
-    parser.add_argument('--model', default='RN50x4')
+    parser.add_argument('--model', default='P1_ckpt/ViT-L-14.pt')
     parser.add_argument("--do_eval", action='store_true')
     args = parser.parse_args()
     return args

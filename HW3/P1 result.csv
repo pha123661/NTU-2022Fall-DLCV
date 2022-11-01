@@ -1,0 +1,5 @@
+Model    ,Accuracy
+ViT-B-32 ,  0.7120
+ViT-L-14 ,  0.8144
+RN50     ,  0.5008
+RN50x4   ,  0.4412
