@@ -73,8 +73,7 @@ class ImageCaptioningTransformer(nn.Module):
 
     def save(self, path, name):
         torch.save(self.state_dict(), path / f"{name}.pth")
-        json.dump(
-            self.config, (path / f"{name}_config.json").open(mode='w'), indent=4)
+
 
 
 class PositionalEmbedding(nn.Module):
