@@ -43,8 +43,8 @@ def main(args):
     Transformer = ImageCaptioningTransformer(
         vocab_size=tokenizer.get_vocab_size(),
         encoder=args.model,
-        num_layers=6,
-        nhead=8,
+        num_layers=4,
+        nhead=12,
         d_model=768,
     )
     Transformer = Transformer.to(args.device)
