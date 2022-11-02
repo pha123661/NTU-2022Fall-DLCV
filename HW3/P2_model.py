@@ -71,10 +71,6 @@ class ImageCaptioningTransformer(nn.Module):
         ).masked_fill(mask == 1, float(0.0))
         return mask
 
-    def save(self, path, name):
-        torch.save(self.state_dict(), path / f"{name}.pth")
-
-
 
 class PositionalEmbedding(nn.Module):
 
