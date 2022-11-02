@@ -19,19 +19,20 @@ from warmup_scheduler import GradualWarmupScheduler
 
 def main(args):
     # Log/Validation
+    log_global_step = 0
+    history_best = 10e10
     if args.tensorboard_path.exists():
         shutil.rmtree(args.tensorboard_path)
     writer = SummaryWriter(args.tensorboard_path)
     evaluator = CocoEvaluator(coco_types=["CIDEr"], unk_token="[UNK]")
-    prof = torch.profiler.profile(
+    profiler = torch.profiler.profile(
         schedule=torch.profiler.schedule(
-            wait=10, warmup=10, active=300, repeat=2),
+            wait=1, warmup=10, active=500, repeat=3),
         on_trace_ready=torch.profiler.tensorboard_trace_handler(
-            args.tensorboard_path),
+            str(args.tensorboard_path / 'profiles')),
         record_shapes=True,
-        with_stack=True)
-    log_global_step = 0
-    history_best = 10e10
+        with_stack=True
+    )
 
     # Preprocess
     tokenizer = Tokenizer.from_file(args.tokenizer)
@@ -65,8 +66,12 @@ def main(args):
         nhead=12,
         d_model=768,
     )
+    json.dump(Transformer.get_config(), (args.ckpt_dir /
+              f"model_config.json").open(mode='w'), indent=4)
+    if torch.cuda.device_count() > 1:
+        print(f"## Using {torch.cuda.device_count()} GPUs")
+        Transformer = torch.nn.DataParallel(Transformer)
     Transformer = Transformer.to(args.device)
-
     # Training
     optimizer = torch.optim.AdamW(Transformer.parameters(), lr=args.lr)
     cos_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
@@ -78,9 +83,7 @@ def main(args):
     # Misc
     optimizer.zero_grad(set_to_none=True)
     optimizer.step()
-    json.dump(Transformer.config, (args.ckpt_dir /
-              f"model_config.json").open(mode='w'), indent=4)
-    prof.start()
+    profiler.start()
     for epoch in range(args.epochs):
         # Training loop
         for data in tqdm(train_loader):
@@ -96,9 +99,11 @@ def main(args):
                     batch_image=data['images'],
                     input_ids=data['input_ids']
                 )
+                loss = loss.sum()
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
+            profiler.step()
 
             writer.add_scalar(
                 "training/lr", optimizer.param_groups[0]['lr'], global_step=log_global_step)
@@ -126,11 +131,16 @@ def main(args):
         writer.add_scalar("validation/loss", va_loss, global_step=epoch)
         if va_loss < history_best:
             history_best = va_loss
-            torch.save(Transformer.state_dict(),
-                       args.ckpt_dir / "Best_model.pth")
+            if isinstance(Transformer, torch.nn.DataParallel):
+                print('save module')
+                torch.save(Transformer.module.state_dict(),
+                           args.ckpt_dir / "Best_model.pth")
+            else:
+                torch.save(Transformer.state_dict(),
+                           args.ckpt_dir / "Best_model.pth")
             print(f'saved model with metric={va_loss}')
-        prof.step()
-    prof.stop()
+
+    profiler.stop()
 
 
 def parse():
