@@ -27,7 +27,7 @@ def main(args):
     evaluator = CocoEvaluator(coco_types=["CIDEr"], unk_token="[UNK]")
     profiler = torch.profiler.profile(
         schedule=torch.profiler.schedule(
-            wait=1, warmup=10, active=500, repeat=3),
+            wait=1, warmup=10, active=10, repeat=3),
         on_trace_ready=torch.profiler.tensorboard_trace_handler(
             str(args.tensorboard_path / 'profiles')),
         record_shapes=True,
@@ -53,11 +53,13 @@ def main(args):
     train_loader = DataLoader(train_set, args.batch_size,
                               collate_fn=train_set.collate_fn,
                               shuffle=True,
-                              num_workers=6)
+                              num_workers=4,
+                              pin_memory=True)
     valid_loader = DataLoader(valid_set, 2 * args.batch_size,
                               collate_fn=valid_set.collate_fn,
                               shuffle=False,
-                              num_workers=6)
+                              num_workers=4,
+                              pin_memory=True)
 
     Transformer = ImageCaptioningTransformer(
         vocab_size=tokenizer.get_vocab_size(),
@@ -101,12 +103,17 @@ def main(args):
                 )
                 loss = loss.sum()
             scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                Transformer.parameters(), 1.0).detach().item()
             scaler.step(optimizer)
             scaler.update()
-            profiler.step()
 
-            writer.add_scalar(
-                "training/lr", optimizer.param_groups[0]['lr'], global_step=log_global_step)
+            profiler.step()
+            writer.add_scalar("training/lr",
+                              optimizer.param_groups[0]['lr'], global_step=log_global_step)
+            writer.add_scalar("training/gradient norm",
+                              grad_norm, global_step=log_global_step)
             writer.add_scalar("training/loss", loss.item(),
                               global_step=log_global_step)
             log_global_step += 1
@@ -125,6 +132,7 @@ def main(args):
                         batch_image=data['images'],
                         input_ids=data['input_ids']
                     )
+                loss = loss.sum()
             va_losses.append(loss.item())
 
         va_loss = sum(va_losses) / len(va_losses)
