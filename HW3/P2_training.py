@@ -66,7 +66,7 @@ def main(args):
         nhead=12,
         d_model=768,
     )
-    json.dump(Transformer.get_config(), (args.ckpt_dir /
+    json.dump(Transformer.config, (args.ckpt_dir /
               f"model_config.json").open(mode='w'), indent=4)
     if torch.cuda.device_count() > 1:
         print(f"## Using {torch.cuda.device_count()} GPUs")
