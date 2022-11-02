@@ -57,39 +57,42 @@ def main(args):
         optimizer, multiplier=1, total_epoch=args.warmup_steps, after_scheduler=cos_scheduler)
 
     # Log/Validation
-    shutil.rmtree(args.tensorboard_path)
+    if args.tensorboard_path.exists():
+        shutil.rmtree(args.tensorboard_path)
     writer = SummaryWriter(args.tensorboard_path)
     log_global_step = 0
     evaluator = CocoEvaluator(coco_types=["CIDEr"], unk_token="[UNK]")
 
     for epoch in range(args.epochs):
         # Training loop
-        for data in tqdm(train_loader):
-            scheduler.step()
-            optimizer.zero_grad()
-            data['images'] = data['images'].to(args.device)
-            data['input_ids'] = data['input_ids'].to(args.device)
-            loss = Transformer(
-                batch_image=data['images'],
-                input_ids=data['input_ids']
-            )
-            loss.backward()
-            optimizer.step()
+        # for data in tqdm(train_loader):
+        #     scheduler.step()
+        #     optimizer.zero_grad()
+        #     data['images'] = data['images'].to(args.device)
+        #     data['input_ids'] = data['input_ids'].to(args.device)
+        #     loss = Transformer(
+        #         batch_image=data['images'],
+        #         input_ids=data['input_ids']
+        #     )
+        #     loss.backward()
+        #     optimizer.step()
 
-            writer.add_scalar(
-                "training/lr", optimizer.param_groups[0]['lr'], global_step=log_global_step)
-            writer.add_scalar("training/loss", loss.item(),
-                              global_step=log_global_step)
-            log_global_step += 1
+        #     writer.add_scalar(
+        #         "training/lr", optimizer.param_groups[0]['lr'], global_step=log_global_step)
+        #     writer.add_scalar("training/loss", loss.item(),
+        #                       global_step=log_global_step)
+        #     log_global_step += 1
 
-        # Validation loop
-        for data in tqdm(valid_loader):
-            pass
+        # # Validation loop
+        # for data in tqdm(valid_loader):
+        #     pass
+        Transformer.save(args.ckpt_dir, "Best_model")
 
 
 def parse():
     parser = argparse.ArgumentParser()
-    # Path args
+
+    # Input Path
     parser.add_argument('--train_image_dir', type=pathlib.Path,
                         default='hw3_data/p2_data/images/train')
     parser.add_argument('--valid_image_dir', type=pathlib.Path,
@@ -98,12 +101,14 @@ def parse():
                         default='hw3_data/p2_data/train.json')
     parser.add_argument('--valid_info', type=pathlib.Path,
                         default='hw3_data/p2_data/val.json')
-    parser.add_argument("--tensorboard_path",
-                        type=pathlib.Path, default="./p2_tb")
-
     parser.add_argument('--model', type=str, default='vit_base_patch16_224')
     parser.add_argument('--tokenizer', type=str,
                         default='./hw3_data/caption_tokenizer.json')
+
+    # Output Path
+    parser.add_argument("--tensorboard_path",
+                        type=pathlib.Path, default="./p2_tb")
+    parser.add_argument("--ckpt_dir", type=pathlib.Path, default="./P2_ckpt")
 
     # Training args
     parser.add_argument('--device', type=torch.device,
@@ -119,4 +124,5 @@ def parse():
 
 if __name__ == '__main__':
     args = parse()
+    args.ckpt_dir.mkdir(exist_ok=True, parents=True)
     main(args)
