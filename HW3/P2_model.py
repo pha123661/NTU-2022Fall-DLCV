@@ -89,7 +89,7 @@ class ImageCaptioningTransformer(nn.Module):
             current_state = torch.concat((current_state, next_word), dim=-1)
         return current_state[0, 1:].cpu().tolist()  # remove [BOS]
 
-    def batch_geedy_search(self, batch_img, max_length=30):
+    def batch_greedy_search(self, batch_img, max_length=30):
         device = batch_img.device
         batch_size = batch_img.shape[0]
         with torch.no_grad():
@@ -198,6 +198,6 @@ if __name__ == "__main__":
 
     td = DataLoader(train_set, 8, collate_fn=train_set.collate_fn)
     data = next(iter(td))
-    seq = Transformer.batch_geedy_search(data['images'], max_length=6)
+    seq = Transformer.batch_greedy_search(data['images'], max_length=6)
     print(seq)
     print(tokenizer.decode_batch(seq))
