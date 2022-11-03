@@ -54,7 +54,7 @@ def main(args):
 
     pred = dict()
     for data, name in tqdm(valid_set):
-        output_ids = Transformer.generate_one(data.to(args.device))
+        output_ids = Transformer.greedy_search(data.to(args.device))
         sentence = tokenizer.decode(output_ids)
         pred[name] = sentence
 

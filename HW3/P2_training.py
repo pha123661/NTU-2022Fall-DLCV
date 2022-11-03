@@ -63,11 +63,11 @@ def main(args):
                               shuffle=True,
                               num_workers=4 * torch.cuda.device_count(),
                               pin_memory=True)
-    valid_loader = DataLoader(valid_set, 2 * args.batch_size,
-                              collate_fn=valid_set.collate_fn,
-                              shuffle=False,
-                              num_workers=4 * torch.cuda.device_count(),
-                              pin_memory=True)
+    # valid_loader = DataLoader(valid_set, 2 * args.batch_size,
+    #                           collate_fn=valid_set.collate_fn,
+    #                           shuffle=False,
+    #                           num_workers=4 * torch.cuda.device_count(),
+    #                           pin_memory=True)
     if 'base' in args.model:
         Model = ImageCaptioningTransformer(
             vocab_size=tokenizer.get_vocab_size(),
@@ -151,7 +151,7 @@ def main(args):
             with torch.no_grad():
                 with torch.autocast(device_type='cpu' if args.device == torch.device('cpu') else 'cuda',
                                     dtype=torch.float16, enabled=not args.disable_fp16):
-                    output_ids = Model.generate_one(
+                    output_ids = Model.greedy_search(
                         data['image'].to(args.device))
             gen_sentence = tokenizer.decode(output_ids)
 

@@ -68,7 +68,7 @@ class ImageCaptioningTransformer(nn.Module):
         )
         return mask
 
-    def generate_one(self, img, num_candidates=5, beam_size=8, max_length=30):
+    def greedy_search(self, img, num_candidates=5, beam_size=8, max_length=30):
         if img.dim() < 4:
             img = img.unsqueeze(0)
         device = img.device
@@ -160,6 +160,6 @@ if __name__ == "__main__":
     )
 
     data = next(iter(train_set))
-    seq = Transformer.generate_one(data['image'])
+    seq = Transformer.greedy_search(data['image'])
     print(seq)
     print(tokenizer.decode(seq))

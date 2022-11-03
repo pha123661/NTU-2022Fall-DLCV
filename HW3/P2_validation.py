@@ -14,25 +14,25 @@ from tqdm.auto import tqdm
 def main(args):
     preds = json.load(args.pred_json.open(mode='r'))
     # # CLIP score
-    # model, image_process = clip.load(args.CLIP, device=args.device)
-    # clip_scores = []
-    # for image_name, text in tqdm(preds.items()):
-    #     image = Image.open(args.image_dir / f"{image_name}.jpg").convert('RGB')
-    #     image = image_process(image).unsqueeze(0).to(args.device)
-    #     text = clip.tokenize(text).to(args.device)
+    model, image_process = clip.load(args.CLIP, device=args.device)
+    clip_scores = []
+    for image_name, text in tqdm(preds.items()):
+        image = Image.open(args.image_dir / f"{image_name}.jpg").convert('RGB')
+        image = image_process(image).unsqueeze(0).to(args.device)
+        text = clip.tokenize(text).to(args.device)
 
-    #     with torch.no_grad():
-    #         image_features = model.encode_image(image)
-    #         image_features /= image_features.norm(dim=-1, keepdim=True)
-    #         text_features = model.encode_text(text)
-    #         text_features /= text_features.norm(dim=-1, keepdim=True)
+        with torch.no_grad():
+            image_features = model.encode_image(image)
+            image_features /= image_features.norm(dim=-1, keepdim=True)
+            text_features = model.encode_text(text)
+            text_features /= text_features.norm(dim=-1, keepdim=True)
 
-    #     sim = image_features @ text_features.T
-    #     score = 2.5 * max(sim.item(), 0)
-    #     clip_scores.append(score)
+        sim = image_features @ text_features.T
+        score = 2.5 * max(sim.item(), 0)
+        clip_scores.append(score)
 
-    # clip_score = sum(clip_scores) / len(clip_scores)
-    # print(f'clip score={clip_score}')
+    clip_score = sum(clip_scores) / len(clip_scores)
+    print(f'clip score={clip_score}')
 
     # CIDEr score
     evaluator = language_evaluation.CocoEvaluator(coco_types=['CIDEr'])
