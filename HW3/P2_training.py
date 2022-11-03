@@ -128,7 +128,7 @@ def main(args):
                     batch_image=data['images'],
                     input_ids=data['input_ids']
                 )
-                loss = loss.sum()
+                loss = loss.mean()
 
             # Update
             scaler.scale(loss).backward()
