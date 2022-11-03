@@ -64,7 +64,7 @@ def main(args):
         Transformer = ImageCaptioningTransformer(
             vocab_size=tokenizer.get_vocab_size(),
             encoder=args.model,
-            num_layers=6,
+            num_layers=4,
             nhead=12,
             d_model=768,
             dropout=0.1,
@@ -73,7 +73,7 @@ def main(args):
         Transformer = ImageCaptioningTransformer(
             vocab_size=tokenizer.get_vocab_size(),
             encoder=args.model,
-            num_layers=6,
+            num_layers=4,
             nhead=16,
             d_model=1024,
             dropout=0.1,
