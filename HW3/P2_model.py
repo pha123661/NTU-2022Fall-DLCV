@@ -68,7 +68,7 @@ class ImageCaptioningTransformer(nn.Module):
         )
         return mask
 
-    def greedy_search(self, img, num_candidates=5, beam_size=8, max_length=30):
+    def greedy_search(self, img, max_length=30):
         if img.dim() < 4:
             img = img.unsqueeze(0)
         device = img.device
@@ -89,6 +89,41 @@ class ImageCaptioningTransformer(nn.Module):
             current_state = torch.concat((current_state, next_word), dim=-1)
         return current_state[0, 1:].cpu().tolist()  # remove [BOS]
 
+    def batch_geedy_search(self, batch_img, max_length=30):
+        device = batch_img.device
+        batch_size = batch_img.shape[0]
+        with torch.no_grad():
+            memory = self.encoder.forward_features(batch_img)
+
+        current_state = torch.tensor([self.BOS_Token]).to(
+            device).unsqueeze(0).repeat(batch_size, 1)
+
+        done_idx = [-1] * batch_size
+
+        for _ in range(max_length):
+            in_embed = self.word_embedding(current_state)
+            in_embed += self.positional_embedding(in_embed)
+
+            with torch.no_grad():
+                logits = self.decoder(tgt=in_embed, memory=memory)
+                logits = self.head(logits[:, -1, :])
+            next_word = logits.argmax(dim=-1).unsqueeze(1)
+            current_state = torch.concat((current_state, next_word), dim=-1)
+
+            for idx, token_id in enumerate(current_state[:, -1]):
+                if token_id == self.EOS_Token:
+                    done_idx[idx] = idx
+
+            if all(i != -1 for i in done_idx):
+                break
+
+        current_state = current_state.cpu().tolist()
+
+        ret = []
+        for end_idx, seq in zip(done_idx, current_state):
+            ret.append(seq[1:end_idx])
+
+        return ret
         # memory_beam = memory.detach().repeat(beam_size, 1, 1)
         # beam = Beam(
         #     beam_size=beam_size,
@@ -141,12 +176,14 @@ if __name__ == "__main__":
     from tokenizers import Tokenizer
 
     from ICDataset import ICDataset
+    from torch.utils.data import DataLoader
     Transformer = ImageCaptioningTransformer(
         vocab_size=18022,
-        encoder="vit_base_patch16_224",
-        num_layers=4,
-        nhead=12,
-        d_model=768,
+        encoder="beitv2_large_patch16_224_in22k",
+        num_layers=12,
+        nhead=16,
+        d_model=1024,
+        dropout=0.1,
     )
 
     transform = create_transform(
@@ -159,7 +196,8 @@ if __name__ == "__main__":
         tokenizer=tokenizer
     )
 
-    data = next(iter(train_set))
-    seq = Transformer.greedy_search(data['image'])
+    td = DataLoader(train_set, 8, collate_fn=train_set.collate_fn)
+    data = next(iter(td))
+    seq = Transformer.batch_geedy_search(data['images'], max_length=6)
     print(seq)
-    print(tokenizer.decode(seq))
+    print(tokenizer.decode_batch(seq))
