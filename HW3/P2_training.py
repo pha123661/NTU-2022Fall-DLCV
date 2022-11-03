@@ -49,11 +49,11 @@ def main(args):
                               shuffle=True,
                               num_workers=4 * torch.cuda.device_count(),
                               pin_memory=True)
-    valid_loader = DataLoader(valid_set,
-                              batch_size=2 * args.batch_size,
-                              shuffle=False,
-                              num_workers=4 * torch.cuda.device_count(),
-                              pin_memory=True)
+    # valid_loader = DataLoader(valid_set,
+    #                           batch_size=2 * args.batch_size,
+    #                           shuffle=False,
+    #                           num_workers=4 * torch.cuda.device_count(),
+    #                           pin_memory=True)
     if 'base' in args.model:
         Model = ImageCaptioningTransformer(
             vocab_size=tokenizer.get_vocab_size(),
@@ -189,6 +189,17 @@ def main(args):
 
         writer.add_scalar("validation/CLIPscore",
                           clip_score, global_step=epoch)
+
+        # Callback
+        if clip_score > history_best:
+            history_best = clip_score
+            if isinstance(Model, torch.nn.DataParallel):
+                torch.save(Model.module.state_dict(),
+                           args.ckpt_dir / "Best_model.pth")
+            else:
+                torch.save(Model.state_dict(),
+                           args.ckpt_dir / "Best_model.pth")
+            print(f'saved model with metric={clip_score}')
 
 
 def parse():

@@ -77,10 +77,9 @@ class ImageCaptioningTransformer(nn.Module):
 
         current_state = torch.tensor([self.BOS_Token]).to(device).unsqueeze(1)
         for _ in range(max_length):
-            in_embed = self.word_embedding(current_state)
-            in_embed += self.positional_embedding(in_embed)
-
             with torch.no_grad():
+                in_embed = self.word_embedding(current_state)
+                in_embed += self.positional_embedding(in_embed)
                 logits = self.decoder(tgt=in_embed, memory=memory)
                 logits = self.head(logits[:, -1, :])
             next_word = logits.argmax(dim=-1).unsqueeze(0)
