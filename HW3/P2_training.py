@@ -49,16 +49,17 @@ def main(args):
                               shuffle=True,
                               num_workers=4 * torch.cuda.device_count(),
                               pin_memory=True)
-    # valid_loader = DataLoader(valid_set,
-    #                           batch_size=2 * args.batch_size,
-    #                           shuffle=False,
-    #                           num_workers=4 * torch.cuda.device_count(),
-    #                           pin_memory=True)
+    valid_loader = DataLoader(valid_set,
+                              batch_size=2 * args.batch_size,
+                              collate_fn=valid_set.collate_fn,
+                              shuffle=False,
+                              num_workers=4 * torch.cuda.device_count(),
+                              pin_memory=True)
     if 'base' in args.model:
         Model = ImageCaptioningTransformer(
             vocab_size=tokenizer.get_vocab_size(),
             encoder=args.model,
-            num_layers=4,
+            num_layers=6,
             nhead=12,
             d_model=768,
             dropout=0.1,
@@ -67,7 +68,7 @@ def main(args):
         Model = ImageCaptioningTransformer(
             vocab_size=tokenizer.get_vocab_size(),
             encoder=args.model,
-            num_layers=12,
+            num_layers=6,
             nhead=16,
             d_model=1024,
             dropout=0.1,
@@ -99,7 +100,8 @@ def main(args):
 
     # Log/Validation
     log_global_step = 0
-    history_best = 0
+    history_best_CLIPscore = 0
+    history_best_valoss = 10e10
     if args.tensorboard_path.exists():
         shutil.rmtree(args.tensorboard_path)
     writer = SummaryWriter(args.tensorboard_path)
@@ -151,7 +153,8 @@ def main(args):
         clip_scores = []
         Model.eval()
         pbar = tqdm(enumerate(valid_set), total=1000)
-        pbar.set_description(f"Best metric={history_best}")
+        pbar.set_description(
+            f"Best CLIIPs={history_best_CLIPscore}, valoss={history_best_valoss}")
         for cnt, data in pbar:
             if cnt >= 1000:
                 break
@@ -189,17 +192,43 @@ def main(args):
 
         writer.add_scalar("validation/CLIPscore",
                           clip_score, global_step=epoch)
-
-        # Callback
-        if clip_score > history_best:
-            history_best = clip_score
+        if clip_score > history_best_CLIPscore:
+            history_best_CLIPscore = clip_score
             if isinstance(Model, torch.nn.DataParallel):
                 torch.save(Model.module.state_dict(),
-                           args.ckpt_dir / "Best_model.pth")
+                           args.ckpt_dir / "Best_CLIPs_model.pth")
             else:
                 torch.save(Model.state_dict(),
-                           args.ckpt_dir / "Best_model.pth")
-            print(f'saved model with metric={clip_score}')
+                           args.ckpt_dir / "Best_CLIPs_model.pth")
+            print(f'saved model with CLIPs={clip_score}')
+
+        va_losses = []
+        for data in tqdm(valid_loader):
+            data['images'] = data['images'].to(args.device, non_blocking=True)
+            data['input_ids'] = data['input_ids'].to(
+                args.device, non_blocking=True)
+
+            with torch.no_grad():
+                with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
+                    loss = Model(
+                        batch_image=data['images'],
+                        input_ids=data['input_ids']
+                    )
+            va_losses.append(loss.item())
+
+        va_loss = sum(va_losses) / len(va_losses)
+        writer.add_scalar("validation/loss", va_loss, global_step=epoch)
+
+        # Callback
+        if va_loss < history_best_valoss:
+            history_best_valoss = va_loss
+            if isinstance(Model, torch.nn.DataParallel):
+                torch.save(Model.module.state_dict(),
+                           args.ckpt_dir / "Best_valoss_model.pth")
+            else:
+                torch.save(Model.state_dict(),
+                           args.ckpt_dir / "Best_valoss_model.pth")
+            print(f'saved model with valoss={clip_score}')
 
 
 def parse():
