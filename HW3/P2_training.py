@@ -86,6 +86,7 @@ def main(args):
         print(f"## Using {torch.cuda.device_count()} GPUs")
         Transformer = torch.nn.DataParallel(Transformer)
     Transformer = Transformer.to(args.device)
+
     # Training
     optimizer = torch.optim.AdamW(Transformer.parameters(), lr=args.lr)
     cos_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
