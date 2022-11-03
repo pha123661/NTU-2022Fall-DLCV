@@ -58,10 +58,12 @@ class ImageCaptioningTransformer(nn.Module):
     # https://github.com/pytorch/examples/blob/5551061414d3bcf202de520d20e8163f58eb664a/word_language_model/model.py#L126
     def _generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(
-            mask == 0,
-            float('-inf')
-        ).masked_fill(mask == 1, float(0.0))
+        mask = mask.float(
+        ).masked_fill(
+            mask == 0, float('-inf')
+        ).masked_fill(
+            mask == 1, float(0.0)
+        )
         return mask
 
 
