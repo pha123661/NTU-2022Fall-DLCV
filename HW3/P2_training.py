@@ -3,6 +3,8 @@ import json
 import pathlib
 import shutil
 
+from PIL import Image
+import clip
 import torch
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
@@ -67,7 +69,7 @@ def main(args):
                               num_workers=4 * torch.cuda.device_count(),
                               pin_memory=True)
     if 'base' in args.model:
-        Transformer = ImageCaptioningTransformer(
+        Model = ImageCaptioningTransformer(
             vocab_size=tokenizer.get_vocab_size(),
             encoder=args.model,
             num_layers=4,
@@ -76,7 +78,7 @@ def main(args):
             dropout=0.1,
         )
     elif 'large' in args.model:
-        Transformer = ImageCaptioningTransformer(
+        Model = ImageCaptioningTransformer(
             vocab_size=tokenizer.get_vocab_size(),
             encoder=args.model,
             num_layers=4,
@@ -85,16 +87,16 @@ def main(args):
             dropout=0.2,
         )
     else:
-        raise Exception(args.model)
-    json.dump(Transformer.config, (args.ckpt_dir /
+        raise Exception(f"Cannot auto config {args.model}")
+    json.dump(Model.config, (args.ckpt_dir /
               f"model_config.json").open(mode='w'), indent=4)
     if torch.cuda.device_count() > 1:
         print(f"## Using {torch.cuda.device_count()} GPUs")
-        Transformer = torch.nn.DataParallel(Transformer)
-    Transformer = Transformer.to(args.device)
+        Model = torch.nn.DataParallel(Model)
+    Model = Model.to(args.device)
 
     # Training
-    optimizer = torch.optim.AdamW(Transformer.parameters(), lr=args.lr)
+    optimizer = torch.optim.AdamW(Model.parameters(), lr=args.lr)
     cos_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=args.epochs * len(train_loader))
     scheduler = GradualWarmupScheduler(
@@ -104,7 +106,9 @@ def main(args):
     # Misc
     optimizer.zero_grad(set_to_none=True)
     optimizer.step()
-    # profiler.start()
+
+    # clip
+    model, image_process = clip.load("ViT-B/32", device=args.device)
     for epoch in range(args.epochs):
         # Training loop
         for data in tqdm(train_loader):
@@ -116,7 +120,7 @@ def main(args):
 
             with torch.autocast(device_type='cpu' if args.device == torch.device('cpu') else 'cuda',
                                 dtype=torch.float16, enabled=not args.disable_fp16):
-                loss = Transformer(
+                loss = Model(
                     batch_image=data['images'],
                     input_ids=data['input_ids']
                 )
@@ -124,7 +128,7 @@ def main(args):
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
             grad_norm = torch.nn.utils.clip_grad_norm_(
-                Transformer.parameters(), 1.0).detach().item()
+                Model.parameters(), 1.0).detach().item()
             scaler.step(optimizer)
             scaler.update()
 
@@ -138,35 +142,51 @@ def main(args):
             log_global_step += 1
 
         # Validation loop
-        for data in tqdm(valid_loader):
-            data['images'] = data['images'].to(args.device, non_blocking=True)
-            data['input_ids'] = data['input_ids'].to(
-                args.device, non_blocking=True)
-
-            va_losses = []
+        clip_scores = []
+        Model.eval()
+        for cnt, data in tqdm(enumerate(valid_set), total=1000):
+            if cnt >= 1000:
+                break
+            # Generate sentence
             with torch.no_grad():
                 with torch.autocast(device_type='cpu' if args.device == torch.device('cpu') else 'cuda',
                                     dtype=torch.float16, enabled=not args.disable_fp16):
-                    loss = Transformer(
-                        batch_image=data['images'],
-                        input_ids=data['input_ids']
-                    )
-                loss = loss.sum()
-            va_losses.append(loss.item())
+                    output_ids = Model.generate_one(
+                        data['image'].to(args.device))
+            gen_sentence = tokenizer.decode(output_ids)
 
-        va_loss = sum(va_losses) / len(va_losses)
-        writer.add_scalar("validation/loss", va_loss, global_step=epoch)
-        if va_loss < history_best:
-            history_best = va_loss
-            if isinstance(Transformer, torch.nn.DataParallel):
-                torch.save(Transformer.module.state_dict(),
+            # Preprocess clip features
+            clip_image = Image.open(
+                args.valid_image_dir / f"{data['filename']}.jpg").convert('RGB')
+            clip_image = image_process(
+                clip_image).unsqueeze(0).to(args.device)
+            text = clip.tokenize(gen_sentence).to(args.device)
+
+            # Calculate similarity
+            with torch.no_grad():
+                image_features = model.encode_image(clip_image)
+                text_features = model.encode_text(text)
+            image_features /= image_features.norm(
+                dim=-1, keepdim=True)
+            text_features /= text_features.norm(
+                dim=-1, keepdim=True)
+            sim = image_features @ text_features.T
+            score = 2.5 * max(sim.item(), 0)
+            clip_scores.append(score)
+        Model.train()
+        clip_score = sum(clip_scores) / len(clip_scores)
+
+        writer.add_scalar("validation/CLIPscore",
+                          clip_score, global_step=epoch)
+        if clip_score > history_best:
+            history_best = clip_score
+            if isinstance(Model, torch.nn.DataParallel):
+                torch.save(Model.module.state_dict(),
                            args.ckpt_dir / "Best_model.pth")
             else:
-                torch.save(Transformer.state_dict(),
+                torch.save(Model.state_dict(),
                            args.ckpt_dir / "Best_model.pth")
-            print(f'saved model with metric={va_loss}')
-
-    # profiler.stop()
+            print(f'saved model with metric={clip_score}')
 
 
 def parse():
