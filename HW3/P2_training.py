@@ -1,4 +1,5 @@
 import argparse
+import json
 import pathlib
 import shutil
 
@@ -17,6 +18,22 @@ from warmup_scheduler import GradualWarmupScheduler
 
 
 def main(args):
+    # Log/Validation
+    log_global_step = 0
+    history_best = 10e10
+    if args.tensorboard_path.exists():
+        shutil.rmtree(args.tensorboard_path)
+    writer = SummaryWriter(args.tensorboard_path)
+    evaluator = CocoEvaluator(coco_types=["CIDEr"], unk_token="[UNK]")
+    profiler = torch.profiler.profile(
+        schedule=torch.profiler.schedule(
+            wait=1, warmup=10, active=10, repeat=3),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler(
+            str(args.tensorboard_path / 'profiles')),
+        record_shapes=True,
+        with_stack=True
+    )
+
     # Preprocess
     tokenizer = Tokenizer.from_file(args.tokenizer)
     transform = create_transform(**resolve_data_config({}, model=args.model))
@@ -35,10 +52,14 @@ def main(args):
 
     train_loader = DataLoader(train_set, args.batch_size,
                               collate_fn=train_set.collate_fn,
-                              num_workers=6)
-    valid_loader = DataLoader(valid_set, args.batch_size,
+                              shuffle=True,
+                              num_workers=4,
+                              pin_memory=True)
+    valid_loader = DataLoader(valid_set, 2 * args.batch_size,
                               collate_fn=valid_set.collate_fn,
-                              num_workers=6)
+                              shuffle=False,
+                              num_workers=4,
+                              pin_memory=True)
 
     Transformer = ImageCaptioningTransformer(
         vocab_size=tokenizer.get_vocab_size(),
@@ -47,49 +68,93 @@ def main(args):
         nhead=12,
         d_model=768,
     )
+    json.dump(Transformer.config, (args.ckpt_dir /
+              f"model_config.json").open(mode='w'), indent=4)
+    if torch.cuda.device_count() > 1:
+        print(f"## Using {torch.cuda.device_count()} GPUs")
+        Transformer = torch.nn.DataParallel(Transformer)
     Transformer = Transformer.to(args.device)
-
     # Training
     optimizer = torch.optim.AdamW(Transformer.parameters(), lr=args.lr)
     cos_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=args.epochs * len(train_loader))
     scheduler = GradualWarmupScheduler(
         optimizer, multiplier=1, total_epoch=args.warmup_steps, after_scheduler=cos_scheduler)
+    scaler = torch.cuda.amp.GradScaler(enabled=not args.disable_fp16)
 
-    # Log/Validation
-    shutil.rmtree(args.tensorboard_path)
-    writer = SummaryWriter(args.tensorboard_path)
-    log_global_step = 0
-    evaluator = CocoEvaluator(coco_types=["CIDEr"], unk_token="[UNK]")
-
+    # Misc
+    optimizer.zero_grad(set_to_none=True)
+    optimizer.step()
+    profiler.start()
     for epoch in range(args.epochs):
         # Training loop
         for data in tqdm(train_loader):
             scheduler.step()
-            optimizer.zero_grad()
-            data['images'] = data['images'].to(args.device)
-            data['input_ids'] = data['input_ids'].to(args.device)
-            loss = Transformer(
-                batch_image=data['images'],
-                input_ids=data['input_ids']
-            )
-            loss.backward()
-            optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
+            data['images'] = data['images'].to(args.device, non_blocking=True)
+            data['input_ids'] = data['input_ids'].to(
+                args.device, non_blocking=True)
 
-            writer.add_scalar(
-                "training/lr", optimizer.param_groups[0]['lr'], global_step=log_global_step)
+            with torch.autocast(device_type='cpu' if args.device == torch.device('cpu') else 'cuda',
+                                dtype=torch.float16, enabled=not args.disable_fp16):
+                loss = Transformer(
+                    batch_image=data['images'],
+                    input_ids=data['input_ids']
+                )
+                loss = loss.sum()
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                Transformer.parameters(), 1.0).detach().item()
+            scaler.step(optimizer)
+            scaler.update()
+
+            profiler.step()
+            writer.add_scalar("training/lr",
+                              optimizer.param_groups[0]['lr'], global_step=log_global_step)
+            writer.add_scalar("training/gradient norm",
+                              grad_norm, global_step=log_global_step)
             writer.add_scalar("training/loss", loss.item(),
                               global_step=log_global_step)
             log_global_step += 1
 
         # Validation loop
         for data in tqdm(valid_loader):
-            pass
+            data['images'] = data['images'].to(args.device, non_blocking=True)
+            data['input_ids'] = data['input_ids'].to(
+                args.device, non_blocking=True)
+
+            va_losses = []
+            with torch.no_grad():
+                with torch.autocast(device_type='cpu' if args.device == torch.device('cpu') else 'cuda',
+                                    dtype=torch.float16, enabled=not args.disable_fp16):
+                    loss = Transformer(
+                        batch_image=data['images'],
+                        input_ids=data['input_ids']
+                    )
+                loss = loss.sum()
+            va_losses.append(loss.item())
+
+        va_loss = sum(va_losses) / len(va_losses)
+        writer.add_scalar("validation/loss", va_loss, global_step=epoch)
+        if va_loss < history_best:
+            history_best = va_loss
+            if isinstance(Transformer, torch.nn.DataParallel):
+                print('save module')
+                torch.save(Transformer.module.state_dict(),
+                           args.ckpt_dir / "Best_model.pth")
+            else:
+                torch.save(Transformer.state_dict(),
+                           args.ckpt_dir / "Best_model.pth")
+            print(f'saved model with metric={va_loss}')
+
+    profiler.stop()
 
 
 def parse():
     parser = argparse.ArgumentParser()
-    # Path args
+
+    # Environment
     parser.add_argument('--train_image_dir', type=pathlib.Path,
                         default='hw3_data/p2_data/images/train')
     parser.add_argument('--valid_image_dir', type=pathlib.Path,
@@ -98,20 +163,25 @@ def parse():
                         default='hw3_data/p2_data/train.json')
     parser.add_argument('--valid_info', type=pathlib.Path,
                         default='hw3_data/p2_data/val.json')
-    parser.add_argument("--tensorboard_path",
-                        type=pathlib.Path, default="./p2_tb")
-
-    parser.add_argument('--model', type=str, default='vit_base_patch16_224')
+    parser.add_argument('--model', type=str,
+                        default='vit_base_patch16_224')
     parser.add_argument('--tokenizer', type=str,
                         default='./hw3_data/caption_tokenizer.json')
-
-    # Training args
     parser.add_argument('--device', type=torch.device,
                         default='cuda' if torch.cuda.is_available() else 'cpu')
-    parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--lr", type=float, default=2e-5)
+
+    # Output Path
+    parser.add_argument("--tensorboard_path",
+                        type=pathlib.Path, default="./P2_tb")
+    parser.add_argument("--ckpt_dir",
+                        type=pathlib.Path, default="./P2_ckpt")
+
+    # Training args
+    parser.add_argument("--disable_fp16", action="store_true")
+    parser.add_argument("--epochs", type=int, default=15)
+    parser.add_argument("--lr", type=float, default=5e-5)
     parser.add_argument("--warmup_steps", type=int, default=300)
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=64)
 
     args = parser.parse_args()
     return args
@@ -119,4 +189,5 @@ def parse():
 
 if __name__ == '__main__':
     args = parse()
+    args.ckpt_dir.mkdir(exist_ok=True, parents=True)
     main(args)

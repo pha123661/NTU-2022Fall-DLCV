@@ -1,3 +1,4 @@
+import json
 import math
 
 import timm
@@ -11,6 +12,12 @@ class ImageCaptioningTransformer(nn.Module):
 
     def __init__(self, vocab_size, encoder, num_layers, nhead, d_model, activation='gelu', batch_first=True) -> None:
         super().__init__()
+        self.config = dict(locals())
+        del self.config['self']
+        for k in dict(locals()):
+            if k.startswith('_'):
+                del self.config[k]
+
         self.word_embedding = nn.Embedding(vocab_size, d_model, padding_idx=0)
         self.positional_embedding = PositionalEmbedding(d_model=d_model)
 
