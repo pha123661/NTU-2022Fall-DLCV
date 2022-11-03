@@ -94,7 +94,7 @@ def main(args):
         optimizer, T_max=args.epochs * len(train_loader))
     scheduler = GradualWarmupScheduler(
         optimizer, multiplier=1, total_epoch=args.warmup_steps, after_scheduler=cos_scheduler)
-    scaler = torch.cuda.amp.GradScaler(enabled=not args.disable_fp16)
+    scaler = torch.cuda.amp.GradScaler(enabled=args.fp16 or args.bf16)
 
     # Misc
     optimizer.zero_grad(set_to_none=True)
@@ -113,7 +113,7 @@ def main(args):
                 args.device, non_blocking=True)
 
             with torch.autocast(device_type='cpu' if args.device == torch.device('cpu') else 'cuda',
-                                dtype=torch.bfloat16, enabled=not args.disable_fp16):
+                                dtype=torch.bfloat16 if args.bf16 else torch.float16, enabled=args.fp16 or args.bf16):
                 loss = Model(
                     batch_image=data['images'],
                     input_ids=data['input_ids']
@@ -146,7 +146,7 @@ def main(args):
             # Generate sentence
             with torch.no_grad():
                 with torch.autocast(device_type='cpu' if args.device == torch.device('cpu') else 'cuda',
-                                    dtype=torch.bfloat16, enabled=not args.disable_fp16):
+                                    dtype=torch.bfloat16 if args.bf16 else torch.float16, enabled=args.fp16 or args.bf16):
                     output_ids = Model.greedy_search(
                         data['image'].to(args.device))
             gen_sentence = tokenizer.decode(output_ids)
@@ -213,7 +213,8 @@ def parse():
                         type=pathlib.Path, default="./P2_ckpt")
 
     # Training args
-    parser.add_argument("--disable_fp16", action="store_true")
+    parser.add_argument("--fp16", action="store_true")
+    parser.add_argument("--bf16", action="store_true")
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument("--lr", type=float, default=5e-5)
     parser.add_argument("--warmup_steps", type=int, default=300)
