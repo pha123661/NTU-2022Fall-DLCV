@@ -110,42 +110,42 @@ def main(args):
     optimizer.step()
 
     for epoch in range(args.epochs):
-        # # Training loop
-        # pbar = tqdm(train_loader)
-        # for data in pbar:
-        #     # Prepare data
-        #     scheduler.step()
-        #     optimizer.zero_grad(set_to_none=True)
-        #     data['images'] = data['images'].to(args.device, non_blocking=True)
-        #     data['input_ids'] = data['input_ids'].to(
-        #         args.device, non_blocking=True)
+        # Training loop
+        pbar = tqdm(train_loader)
+        for data in pbar:
+            # Prepare data
+            scheduler.step()
+            optimizer.zero_grad(set_to_none=True)
+            data['images'] = data['images'].to(args.device, non_blocking=True)
+            data['input_ids'] = data['input_ids'].to(
+                args.device, non_blocking=True)
 
-        #     # Get loss
-        #     with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
-        #         loss = Model(
-        #             batch_image=data['images'],
-        #             input_ids=data['input_ids']
-        #         )
-        #         loss = loss.sum()
+            # Get loss
+            with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
+                loss = Model(
+                    batch_image=data['images'],
+                    input_ids=data['input_ids']
+                )
+                loss = loss.sum()
 
-        #     # Update
-        #     scaler.scale(loss).backward()
-        #     scaler.unscale_(optimizer)
-        #     grad_norm = torch.nn.utils.clip_grad_norm_(
-        #         Model.parameters(), 1.0).detach().item()
-        #     scaler.step(optimizer)
-        #     scaler.update()
+            # Update
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                Model.parameters(), 1.0).detach().item()
+            scaler.step(optimizer)
+            scaler.update()
 
-        #     # Log
-        #     writer.add_scalar("training/lr",
-        #                       optimizer.param_groups[0]['lr'], global_step=log_global_step)
-        #     writer.add_scalar("training/gradient norm",
-        #                       grad_norm, global_step=log_global_step)
-        #     writer.add_scalar("training/loss", loss.item(),
-        #                       global_step=log_global_step)
-        #     pbar.set_description(f"Loss={loss.item():.2f}")
+            # Log
+            writer.add_scalar("training/lr",
+                              optimizer.param_groups[0]['lr'], global_step=log_global_step)
+            writer.add_scalar("training/gradient norm",
+                              grad_norm, global_step=log_global_step)
+            writer.add_scalar("training/loss", loss.item(),
+                              global_step=log_global_step)
+            pbar.set_description(f"Loss={loss.item():.2f}")
 
-        #     log_global_step += 1
+            log_global_step += 1
 
         # Validation loop
         clip_scores = []
