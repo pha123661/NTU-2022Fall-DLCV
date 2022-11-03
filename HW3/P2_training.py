@@ -113,7 +113,7 @@ def main(args):
                 args.device, non_blocking=True)
 
             with torch.autocast(device_type='cpu' if args.device == torch.device('cpu') else 'cuda',
-                                dtype=torch.float16, enabled=not args.disable_fp16):
+                                dtype=torch.bfloat16, enabled=not args.disable_fp16):
                 loss = Model(
                     batch_image=data['images'],
                     input_ids=data['input_ids']
