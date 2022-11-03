@@ -11,6 +11,7 @@ from tokenizers import Tokenizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard.writer import SummaryWriter
 from tqdm.auto import tqdm
+from torchvision import transforms
 
 from ICDataset import ICDataset
 from P2_model import ImageCaptioningTransformer
@@ -24,23 +25,29 @@ def main(args):
     if args.tensorboard_path.exists():
         shutil.rmtree(args.tensorboard_path)
     writer = SummaryWriter(args.tensorboard_path)
-    evaluator = CocoEvaluator(coco_types=["CIDEr"], unk_token="[UNK]")
-    profiler = torch.profiler.profile(
-        schedule=torch.profiler.schedule(
-            wait=1, warmup=10, active=10, repeat=3),
-        on_trace_ready=torch.profiler.tensorboard_trace_handler(
-            str(args.tensorboard_path / 'profiles')),
-        record_shapes=True,
-        with_stack=True
-    )
+    # profiler = torch.profiler.profile(
+    #     schedule=torch.profiler.schedule(
+    #         wait=1, warmup=10, active=10, repeat=3),
+    #     on_trace_ready=torch.profiler.tensorboard_trace_handler(
+    #         str(args.tensorboard_path / 'profiles')),
+    #     record_shapes=True,
+    #     with_stack=True
+    # )
 
     # Preprocess
     tokenizer = Tokenizer.from_file(args.tokenizer)
+    augmentation_transforms = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.AutoAugment(),
+    ])
     transform = create_transform(**resolve_data_config({}, model=args.model))
     train_set = ICDataset(
         image_dir=args.train_image_dir,
         json_file=args.train_info,
-        transform=transform,
+        transform=transforms.Compose([
+            augmentation_transforms,
+            transform,
+        ]),
         tokenizer=tokenizer
     )
     valid_set = ICDataset(
@@ -53,12 +60,12 @@ def main(args):
     train_loader = DataLoader(train_set, args.batch_size,
                               collate_fn=train_set.collate_fn,
                               shuffle=True,
-                              num_workers=4,
+                              num_workers=4 * torch.cuda.device_count(),
                               pin_memory=True)
     valid_loader = DataLoader(valid_set, 2 * args.batch_size,
                               collate_fn=valid_set.collate_fn,
                               shuffle=False,
-                              num_workers=4,
+                              num_workers=4 * torch.cuda.device_count(),
                               pin_memory=True)
     if 'base' in args.model:
         Transformer = ImageCaptioningTransformer(
@@ -76,7 +83,7 @@ def main(args):
             num_layers=4,
             nhead=16,
             d_model=1024,
-            dropout=0.1,
+            dropout=0.2,
         )
     else:
         raise Exception(args.model)
@@ -98,7 +105,7 @@ def main(args):
     # Misc
     optimizer.zero_grad(set_to_none=True)
     optimizer.step()
-    profiler.start()
+    # profiler.start()
     for epoch in range(args.epochs):
         # Training loop
         for data in tqdm(train_loader):
@@ -122,7 +129,7 @@ def main(args):
             scaler.step(optimizer)
             scaler.update()
 
-            profiler.step()
+            # profiler.step()
             writer.add_scalar("training/lr",
                               optimizer.param_groups[0]['lr'], global_step=log_global_step)
             writer.add_scalar("training/gradient norm",
@@ -153,7 +160,6 @@ def main(args):
         if va_loss < history_best:
             history_best = va_loss
             if isinstance(Transformer, torch.nn.DataParallel):
-                print('save module')
                 torch.save(Transformer.module.state_dict(),
                            args.ckpt_dir / "Best_model.pth")
             else:
@@ -161,7 +167,7 @@ def main(args):
                            args.ckpt_dir / "Best_model.pth")
             print(f'saved model with metric={va_loss}')
 
-    profiler.stop()
+    # profiler.stop()
 
 
 def parse():
