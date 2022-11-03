@@ -4,7 +4,6 @@ import pathlib
 import shutil
 
 import torch
-from language_evaluation import CocoEvaluator
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from tokenizers import Tokenizer
