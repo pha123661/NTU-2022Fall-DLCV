@@ -89,12 +89,19 @@ def main(args):
     print(f"## Using {torch.cuda.device_count()} GPUs")
 
     # Training
+    amp_enable = any([args.fp16, args.bf16])
+    amp_dtype = torch.bfloat16 if args.bf16 else torch.float16
+    amp_device_type = 'cpu' if args.device == torch.device('cpu') else 'cuda'
+    if amp_enable:
+        print(
+            f"Enable AMP training using dtype={amp_dtype} on {amp_device_type}")
+
     optimizer = torch.optim.AdamW(Model.parameters(), lr=args.lr)
     cos_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=args.epochs * len(train_loader))
     scheduler = GradualWarmupScheduler(
         optimizer, multiplier=1, total_epoch=args.warmup_steps, after_scheduler=cos_scheduler)
-    scaler = torch.cuda.amp.GradScaler(enabled=args.fp16 or args.bf16)
+    scaler = torch.cuda.amp.GradScaler(enabled=amp_enable)
 
     # Misc
     optimizer.zero_grad(set_to_none=True)
@@ -112,8 +119,7 @@ def main(args):
             data['input_ids'] = data['input_ids'].to(
                 args.device, non_blocking=True)
 
-            with torch.autocast(device_type='cpu' if args.device == torch.device('cpu') else 'cuda',
-                                dtype=torch.bfloat16 if args.bf16 else torch.float16, enabled=args.fp16 or args.bf16):
+            with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
                 loss = Model(
                     batch_image=data['images'],
                     input_ids=data['input_ids']
@@ -145,8 +151,7 @@ def main(args):
                 break
             # Generate sentence
             with torch.no_grad():
-                with torch.autocast(device_type='cpu' if args.device == torch.device('cpu') else 'cuda',
-                                    dtype=torch.bfloat16 if args.bf16 else torch.float16, enabled=args.fp16 or args.bf16):
+                with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
                     output_ids = Model.greedy_search(
                         data['image'].to(args.device))
             gen_sentence = tokenizer.decode(output_ids)
