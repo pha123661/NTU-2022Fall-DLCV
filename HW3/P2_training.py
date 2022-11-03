@@ -20,13 +20,6 @@ from warmup_scheduler import GradualWarmupScheduler
 
 
 def main(args):
-    # Log/Validation
-    log_global_step = 0
-    history_best = 0
-    if args.tensorboard_path.exists():
-        shutil.rmtree(args.tensorboard_path)
-    writer = SummaryWriter(args.tensorboard_path)
-
     # Preprocess
     tokenizer = Tokenizer.from_file(args.tokenizer)
     augmentation_transforms = transforms.Compose([
@@ -50,16 +43,17 @@ def main(args):
         tokenizer=tokenizer
     )
 
-    train_loader = DataLoader(train_set, args.batch_size,
+    train_loader = DataLoader(train_set,
+                              batch_size=args.batch_size,
                               collate_fn=train_set.collate_fn,
                               shuffle=True,
                               num_workers=4 * torch.cuda.device_count(),
                               pin_memory=True)
-    # valid_loader = DataLoader(valid_set, 2 * args.batch_size,
-    #                           collate_fn=valid_set.collate_fn,
-    #                           shuffle=False,
-    #                           num_workers=4 * torch.cuda.device_count(),
-    #                           pin_memory=True)
+    valid_loader = DataLoader(valid_set,
+                              batch_size=2 * args.batch_size,
+                              shuffle=False,
+                              num_workers=4 * torch.cuda.device_count(),
+                              pin_memory=True)
     if 'base' in args.model:
         Model = ImageCaptioningTransformer(
             vocab_size=tokenizer.get_vocab_size(),
@@ -73,10 +67,10 @@ def main(args):
         Model = ImageCaptioningTransformer(
             vocab_size=tokenizer.get_vocab_size(),
             encoder=args.model,
-            num_layers=4,
+            num_layers=12,
             nhead=16,
             d_model=1024,
-            dropout=0.2,
+            dropout=0.1,
         )
     else:
         raise Exception(f"Cannot auto config {args.model}")
@@ -98,48 +92,60 @@ def main(args):
 
     optimizer = torch.optim.AdamW(Model.parameters(), lr=args.lr)
     cos_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=args.epochs * len(train_loader))
+        optimizer, T_max=args.epochs * len(train_loader) - args.warmup_steps)
     scheduler = GradualWarmupScheduler(
         optimizer, multiplier=1, total_epoch=args.warmup_steps, after_scheduler=cos_scheduler)
     scaler = torch.cuda.amp.GradScaler(enabled=amp_enable)
+
+    # Log/Validation
+    log_global_step = 0
+    history_best = 0
+    if args.tensorboard_path.exists():
+        shutil.rmtree(args.tensorboard_path)
+    writer = SummaryWriter(args.tensorboard_path)
+    model, image_process = clip.load("ViT-B/32", device=args.device)
 
     # Misc
     optimizer.zero_grad(set_to_none=True)
     optimizer.step()
 
-    # clip
-    model, image_process = clip.load("ViT-B/32", device=args.device)
     for epoch in range(args.epochs):
-        # Training loop
-        pbar = tqdm(train_loader)
-        for data in pbar:
-            scheduler.step()
-            optimizer.zero_grad(set_to_none=True)
-            data['images'] = data['images'].to(args.device, non_blocking=True)
-            data['input_ids'] = data['input_ids'].to(
-                args.device, non_blocking=True)
+        # # Training loop
+        # pbar = tqdm(train_loader)
+        # for data in pbar:
+        #     # Prepare data
+        #     scheduler.step()
+        #     optimizer.zero_grad(set_to_none=True)
+        #     data['images'] = data['images'].to(args.device, non_blocking=True)
+        #     data['input_ids'] = data['input_ids'].to(
+        #         args.device, non_blocking=True)
 
-            with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
-                loss = Model(
-                    batch_image=data['images'],
-                    input_ids=data['input_ids']
-                )
-                loss = loss.sum()
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            grad_norm = torch.nn.utils.clip_grad_norm_(
-                Model.parameters(), 1.0).detach().item()
-            scaler.step(optimizer)
-            scaler.update()
+        #     # Get loss
+        #     with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
+        #         loss = Model(
+        #             batch_image=data['images'],
+        #             input_ids=data['input_ids']
+        #         )
+        #         loss = loss.sum()
 
-            writer.add_scalar("training/lr",
-                              optimizer.param_groups[0]['lr'], global_step=log_global_step)
-            writer.add_scalar("training/gradient norm",
-                              grad_norm, global_step=log_global_step)
-            writer.add_scalar("training/loss", loss.item(),
-                              global_step=log_global_step)
-            log_global_step += 1
-            pbar.set_description(f"Loss={loss.item():.2f}")
+        #     # Update
+        #     scaler.scale(loss).backward()
+        #     scaler.unscale_(optimizer)
+        #     grad_norm = torch.nn.utils.clip_grad_norm_(
+        #         Model.parameters(), 1.0).detach().item()
+        #     scaler.step(optimizer)
+        #     scaler.update()
+
+        #     # Log
+        #     writer.add_scalar("training/lr",
+        #                       optimizer.param_groups[0]['lr'], global_step=log_global_step)
+        #     writer.add_scalar("training/gradient norm",
+        #                       grad_norm, global_step=log_global_step)
+        #     writer.add_scalar("training/loss", loss.item(),
+        #                       global_step=log_global_step)
+        #     pbar.set_description(f"Loss={loss.item():.2f}")
+
+        #     log_global_step += 1
 
         # Validation loop
         clip_scores = []
@@ -152,8 +158,12 @@ def main(args):
             # Generate sentence
             with torch.no_grad():
                 with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
-                    output_ids = Model.greedy_search(
-                        data['image'].to(args.device))
+                    if torch.cuda.device_count() > 1:
+                        output_ids = Model.module.greedy_search(
+                            data['image'].to(args.device))
+                    else:
+                        output_ids = Model.greedy_search(
+                            data['image'].to(args.device))
             gen_sentence = tokenizer.decode(output_ids)
 
             # Preprocess clip features
@@ -179,17 +189,6 @@ def main(args):
 
         writer.add_scalar("validation/CLIPscore",
                           clip_score, global_step=epoch)
-
-        # Callback
-        if clip_score > history_best:
-            history_best = clip_score
-            if isinstance(Model, torch.nn.DataParallel):
-                torch.save(Model.module.state_dict(),
-                           args.ckpt_dir / "Best_model.pth")
-            else:
-                torch.save(Model.state_dict(),
-                           args.ckpt_dir / "Best_model.pth")
-            print(f'saved model with metric={clip_score}')
 
 
 def parse():
@@ -222,7 +221,7 @@ def parse():
     parser.add_argument("--bf16", action="store_true")
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument("--lr", type=float, default=5e-5)
-    parser.add_argument("--warmup_steps", type=int, default=300)
+    parser.add_argument("--warmup_steps", type=int, default=1000)
     parser.add_argument("--batch_size", type=int, default=32)
 
     args = parser.parse_args()

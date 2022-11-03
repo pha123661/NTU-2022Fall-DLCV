@@ -89,41 +89,41 @@ class ImageCaptioningTransformer(nn.Module):
             current_state = torch.concat((current_state, next_word), dim=-1)
         return current_state[0, 1:].cpu().tolist()  # remove [BOS]
 
-    def batch_greedy_search(self, batch_img, max_length=30):
-        device = batch_img.device
-        batch_size = batch_img.shape[0]
-        with torch.no_grad():
-            memory = self.encoder.forward_features(batch_img)
+    # def batch_greedy_search(self, batch_img, max_length=30):
+    #     device = batch_img.device
+    #     batch_size = batch_img.shape[0]
+    #     with torch.no_grad():
+    #         memory = self.encoder.forward_features(batch_img)
 
-        current_state = torch.tensor([self.BOS_Token]).to(
-            device).unsqueeze(0).repeat(batch_size, 1)
+    #     current_state = torch.tensor([self.BOS_Token]).to(
+    #         device).unsqueeze(0).repeat(batch_size, 1)
 
-        done_idx = [-1] * batch_size
+    #     done_idx = [-1] * batch_size
 
-        for _ in range(max_length):
-            in_embed = self.word_embedding(current_state)
-            in_embed += self.positional_embedding(in_embed)
+    #     for _ in range(max_length):
+    #         in_embed = self.word_embedding(current_state)
+    #         in_embed += self.positional_embedding(in_embed)
 
-            with torch.no_grad():
-                logits = self.decoder(tgt=in_embed, memory=memory)
-                logits = self.head(logits[:, -1, :])
-            next_word = logits.argmax(dim=-1).unsqueeze(1)
-            current_state = torch.concat((current_state, next_word), dim=-1)
+    #         with torch.no_grad():
+    #             logits = self.decoder(tgt=in_embed, memory=memory)
+    #             logits = self.head(logits[:, -1, :])
+    #         next_word = logits.argmax(dim=-1).unsqueeze(1)
+    #         current_state = torch.concat((current_state, next_word), dim=-1)
 
-            for idx, token_id in enumerate(current_state[:, -1]):
-                if token_id == self.EOS_Token:
-                    done_idx[idx] = idx
+    #         for idx, token_id in enumerate(current_state[:, -1]):
+    #             if token_id == self.EOS_Token:
+    #                 done_idx[idx] = idx
 
-            if all(i != -1 for i in done_idx):
-                break
+    #         if all(i != -1 for i in done_idx):
+    #             break
 
-        current_state = current_state.cpu().tolist()
+    #     current_state = current_state.cpu().tolist()
 
-        ret = []
-        for end_idx, seq in zip(done_idx, current_state):
-            ret.append(seq[1:end_idx])
+    #     ret = []
+    #     for end_idx, seq in zip(done_idx, current_state):
+    #         ret.append(seq[1:end_idx])
 
-        return ret
+    #     return ret
         # memory_beam = memory.detach().repeat(beam_size, 1, 1)
         # beam = Beam(
         #     beam_size=beam_size,
