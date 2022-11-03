@@ -60,14 +60,26 @@ def main(args):
                               shuffle=False,
                               num_workers=4,
                               pin_memory=True)
-
-    Transformer = ImageCaptioningTransformer(
-        vocab_size=tokenizer.get_vocab_size(),
-        encoder=args.model,
-        num_layers=4,
-        nhead=12,
-        d_model=768,
-    )
+    if 'base' in args.model:
+        Transformer = ImageCaptioningTransformer(
+            vocab_size=tokenizer.get_vocab_size(),
+            encoder=args.model,
+            num_layers=6,
+            nhead=12,
+            d_model=768,
+            dropout=0.1,
+        )
+    elif 'large' in args.model:
+        Transformer = ImageCaptioningTransformer(
+            vocab_size=tokenizer.get_vocab_size(),
+            encoder=args.model,
+            num_layers=6,
+            nhead=16,
+            d_model=1024,
+            dropout=0.1,
+        )
+    else:
+        raise Exception(args.model)
     json.dump(Transformer.config, (args.ckpt_dir /
               f"model_config.json").open(mode='w'), indent=4)
     if torch.cuda.device_count() > 1:
@@ -164,7 +176,7 @@ def parse():
     parser.add_argument('--valid_info', type=pathlib.Path,
                         default='hw3_data/p2_data/val.json')
     parser.add_argument('--model', type=str,
-                        default='vit_base_patch16_224')
+                        default='beitv2_large_patch16_224_in22k')  #
     parser.add_argument('--tokenizer', type=str,
                         default='./hw3_data/caption_tokenizer.json')
     parser.add_argument('--device', type=torch.device,

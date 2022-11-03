@@ -11,7 +11,7 @@ class ImageCaptioningTransformer(nn.Module):
     BOS_Token = 2
     EOS_Token = 3
 
-    def __init__(self, vocab_size, encoder, num_layers, nhead, d_model, activation='gelu', batch_first=True) -> None:
+    def __init__(self, vocab_size, encoder, num_layers, nhead, d_model, activation='gelu', batch_first=True, dropout=0.1) -> None:
         super().__init__()
         self.config = dict(locals())
         del self.config['self']
@@ -27,11 +27,12 @@ class ImageCaptioningTransformer(nn.Module):
             d_model=d_model,
             nhead=nhead,
             activation=activation,
-            batch_first=batch_first
+            batch_first=batch_first,
+            dropout=dropout,
         )
         self.decoder = nn.TransformerDecoder(
             decoder_layer=decoder_layer,
-            num_layers=num_layers
+            num_layers=num_layers,
         )
         self.head = nn.Linear(d_model, vocab_size)
         self.criterion = nn.CrossEntropyLoss(ignore_index=0)
@@ -40,7 +41,6 @@ class ImageCaptioningTransformer(nn.Module):
         # encoder pass
         features = self.encoder.forward_features(
             batch_image)  # shape = (B, 14*14+1, d_model)
-
         # word embedding + positional embedding
         # 0 ~ n-1 tokens as input
         in_embed = self.word_embedding(input_ids[:, :-1])
