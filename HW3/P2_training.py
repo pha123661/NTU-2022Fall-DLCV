@@ -187,7 +187,6 @@ def main(args):
             sim = image_features @ text_features.T
             score = 2.5 * max(sim.item(), 0)
             clip_scores.append(score)
-        Model.train()
         clip_score = sum(clip_scores) / len(clip_scores)
 
         writer.add_scalar("validation/CLIPscore",
@@ -219,6 +218,7 @@ def main(args):
         va_loss = sum(va_losses) / len(va_losses)
         writer.add_scalar("validation/loss", va_loss, global_step=epoch)
 
+        Model.train()
         # Callback
         if va_loss < history_best_valoss:
             history_best_valoss = va_loss
