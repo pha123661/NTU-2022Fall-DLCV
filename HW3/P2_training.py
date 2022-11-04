@@ -46,13 +46,13 @@ def main(args):
                               batch_size=args.batch_size,
                               collate_fn=train_set.collate_fn,
                               shuffle=True,
-                              num_workers=4 * torch.cuda.device_count(),
+                              num_workers=4,
                               pin_memory=True)
     # valid_loader = DataLoader(valid_set,
     #                           batch_size=2 * args.batch_size,
     #                           collate_fn=valid_set.collate_fn,
     #                           shuffle=False,
-    #                           num_workers=4 * torch.cuda.device_count(),
+    #                           num_workers=4
     #                           pin_memory=True)
     if 'base' in args.model:
         d_model = 768
@@ -72,10 +72,7 @@ def main(args):
               f"model_config.json").open(mode='w'), indent=4)
     print(
         f"## Model #param={sum(p.numel() for p in Model.parameters() if p.requires_grad) / 1e6}M")
-    if torch.cuda.device_count() > 1:
-        Model = torch.nn.DataParallel(Model)
     Model = Model.to(args.device)
-    print(f"## Using {torch.cuda.device_count()} GPUs")
 
     # Training
     amp_enable = any([args.fp16, args.bf16])
@@ -132,7 +129,6 @@ def main(args):
                     batch_image=data['images'],
                     input_ids=data['input_ids']
                 )
-                loss = loss.mean()
 
             # Update
             scaler.scale(loss).backward()
@@ -163,12 +159,8 @@ def main(args):
                     # Generate sentence
                     with torch.no_grad():
                         with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
-                            if torch.cuda.device_count() > 1:
-                                output_ids = Model.module.greedy_search(
-                                    img.to(args.device))
-                            else:
-                                output_ids = Model.greedy_search(
-                                    img.to(args.device))
+                            output_ids = Model.greedy_search(
+                                img.to(args.device))
                     gen_sentence = tokenizer.decode(output_ids)
                     preds[name] = gen_sentence
 
@@ -246,7 +238,6 @@ def main(args):
                 #                 batch_image=data['images'],
                 #                 input_ids=data['input_ids']
                 #             )
-                #             loss = loss.mean()
                 #     va_losses.append(loss.item())
 
                 # va_loss = sum(va_losses) / len(va_losses)
