@@ -1,9 +1,12 @@
 import argparse
 import json
+import os
 import pathlib
 import shutil
+from collections import defaultdict
 
 import clip
+import language_evaluation
 import matplotlib.pyplot as plt
 import torch
 from PIL import Image
@@ -92,6 +95,7 @@ def main(args):
     # Log/Validation
     log_global_step = 0
     history_best_CLIPscore = 0
+    history_best_CIDEr = 0
     history_best_valoss = 10e10
     if args.tensorboard_path.exists():
         shutil.rmtree(args.tensorboard_path)
@@ -101,6 +105,15 @@ def main(args):
     # Misc
     optimizer.zero_grad(set_to_none=True)
     optimizer.step()
+
+    # CIDEr
+    evaluator = language_evaluation.CocoEvaluator(coco_types=['CIDEr'])
+    info = json.load(args.valid_info.open(mode='r'))
+    annotations = defaultdict(list)
+    for data in info['annotations']:
+        annotations[data['image_id']].append(data['caption'])
+    img2id = {os.path.splitext(data['file_name'])[0]: data['id']
+              for data in info['images']}
 
     for epoch in range(args.epochs):
         # Training loop
@@ -141,12 +154,12 @@ def main(args):
             log_global_step += 1
 
             if (log_global_step + 1) % args.validation_steps == 0:
+                preds = dict()
                 Model.eval()
                 # Validation loop
                 clip_scores = []
-                for cnt, (img, name) in tqdm(enumerate(valid_set), total=1000):
-                    if cnt >= 1000:
-                        break
+                for cnt, (img, name) in tqdm(enumerate(valid_set), total=len(valid_set)):
+
                     # Generate sentence
                     with torch.no_grad():
                         with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
@@ -157,6 +170,7 @@ def main(args):
                                 output_ids = Model.greedy_search(
                                     img.to(args.device))
                     gen_sentence = tokenizer.decode(output_ids)
+                    preds[name] = gen_sentence
 
                     # Preprocess clip features
                     raw_image = Image.open(
@@ -188,7 +202,7 @@ def main(args):
                 clip_score = sum(clip_scores) / len(clip_scores)
 
                 writer.add_scalar("validation/CLIPscore",
-                                  clip_score, global_step=epoch)
+                                  clip_score, global_step=log_global_step)
                 if clip_score > history_best_CLIPscore:
                     history_best_CLIPscore = clip_score
                     if isinstance(Model, torch.nn.DataParallel):
@@ -198,6 +212,27 @@ def main(args):
                         torch.save(Model.state_dict(),
                                    args.ckpt_dir / "Best_CLIPs_model.pth")
                     print(f'saved model with CLIPs={clip_score}')
+
+                all_preds = []
+                all_ans = []
+                for image_name, text in preds.items():
+                    all_ans.append(annotations[img2id[image_name]])
+                    all_preds.append(text)
+                CIDEr_score = evaluator.run_evaluation(
+                    all_preds, all_ans)['CIDEr']
+                print(f'CIDEr score={CIDEr_score}')
+                writer.add_scalar("validation/CIDEr",
+                                  CIDEr_score, global_step=log_global_step)
+
+                if CIDEr_score > history_best_CIDEr:
+                    history_best_CIDEr = clip_score
+                    if isinstance(Model, torch.nn.DataParallel):
+                        torch.save(Model.module.state_dict(),
+                                   args.ckpt_dir / "Best_CIDEr_model.pth")
+                    else:
+                        torch.save(Model.state_dict(),
+                                   args.ckpt_dir / "Best_CIDEr_model.pth")
+                    print(f'saved model with CIDEr={CIDEr_score}')
 
                 # va_losses = []
                 # for data in tqdm(valid_loader):
