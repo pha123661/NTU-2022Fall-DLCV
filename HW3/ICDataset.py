@@ -1,9 +1,9 @@
 import json
 import os
 
-from torch.utils.data import Dataset
-from PIL import Image
 import torch
+from PIL import Image
+from torch.utils.data import Dataset
 
 
 class ICDataset(Dataset):
@@ -54,8 +54,26 @@ class ICDataset(Dataset):
         }
 
 
+class Image_dataset(Dataset):
+    def __init__(self, root, transform) -> None:
+        super().__init__()
+
+        self.Transform = transform
+        self.Image_names = [p for p in root.glob("*")]
+
+    def __getitem__(self, idx):
+        img = Image.open(self.Image_names[idx]).convert('RGB')
+        img = self.Transform(img)
+
+        return img, os.path.splitext(os.path.basename(self.Image_names[idx]))[0]
+
+    def __len__(self):
+        return len(self.Image_names)
+
+
 if __name__ == '__main__':
     from pathlib import Path
+
     from torchvision import transforms
     train_set = ICDataset(
         image_dir=Path('hw3_data/p2_data/images/train'),

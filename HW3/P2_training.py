@@ -4,6 +4,7 @@ import pathlib
 import shutil
 
 import clip
+import matplotlib.pyplot as plt
 import torch
 from PIL import Image
 from timm.data import resolve_data_config
@@ -14,7 +15,7 @@ from torch.utils.tensorboard.writer import SummaryWriter
 from torchvision import transforms
 from tqdm.auto import tqdm
 
-from ICDataset import ICDataset
+from ICDataset import ICDataset, Image_dataset
 from P2_model import ImageCaptioningTransformer
 from warmup_scheduler import GradualWarmupScheduler
 
@@ -22,25 +23,20 @@ from warmup_scheduler import GradualWarmupScheduler
 def main(args):
     # Preprocess
     tokenizer = Tokenizer.from_file(args.tokenizer)
-    augmentation_transforms = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.AutoAugment(),
-    ])
+    # augmentation_transforms = transforms.Compose([
+    #     transforms.RandomHorizontalFlip(),
+    #     transforms.AutoAugment(),
+    # ])
     transform = create_transform(**resolve_data_config({}, model=args.model))
     train_set = ICDataset(
         image_dir=args.train_image_dir,
         json_file=args.train_info,
-        transform=transforms.Compose([
-            augmentation_transforms,
-            transform,
-        ]),
-        tokenizer=tokenizer
-    )
-    valid_set = ICDataset(
-        image_dir=args.valid_image_dir,
-        json_file=args.valid_info,
         transform=transform,
         tokenizer=tokenizer
+    )
+    valid_set = Image_dataset(
+        root=args.valid_image_dir,
+        transform=transform,
     )
 
     train_loader = DataLoader(train_set,
@@ -49,32 +45,26 @@ def main(args):
                               shuffle=True,
                               num_workers=4 * torch.cuda.device_count(),
                               pin_memory=True)
-    valid_loader = DataLoader(valid_set,
-                              batch_size=2 * args.batch_size,
-                              collate_fn=valid_set.collate_fn,
-                              shuffle=False,
-                              num_workers=4 * torch.cuda.device_count(),
-                              pin_memory=True)
+    # valid_loader = DataLoader(valid_set,
+    #                           batch_size=2 * args.batch_size,
+    #                           collate_fn=valid_set.collate_fn,
+    #                           shuffle=False,
+    #                           num_workers=4 * torch.cuda.device_count(),
+    #                           pin_memory=True)
     if 'base' in args.model:
-        Model = ImageCaptioningTransformer(
-            vocab_size=tokenizer.get_vocab_size(),
-            encoder=args.model,
-            num_layers=12,
-            nhead=12,
-            d_model=768,
-            dropout=0.1,
-        )
+        d_model = 768
     elif 'large' in args.model:
-        Model = ImageCaptioningTransformer(
-            vocab_size=tokenizer.get_vocab_size(),
-            encoder=args.model,
-            num_layers=6,
-            nhead=16,
-            d_model=1024,
-            dropout=0.1,
-        )
+        d_model = 1024
     else:
         raise Exception(f"Cannot auto config {args.model}")
+    Model = ImageCaptioningTransformer(
+        vocab_size=tokenizer.get_vocab_size(),
+        encoder=args.model,
+        num_layers=4,
+        nhead=4,
+        d_model=d_model,
+        dropout=0.1,
+    )
     json.dump(Model.config, (args.ckpt_dir /
               f"model_config.json").open(mode='w'), indent=4)
     print(
@@ -150,87 +140,94 @@ def main(args):
 
             log_global_step += 1
 
-        # Validation loop
-        clip_scores = []
-        Model.eval()
-        pbar = tqdm(enumerate(valid_set), total=1000)
-        pbar.set_description(
-            f"Best CLIIPs={history_best_CLIPscore}, valoss={history_best_valoss}")
-        for cnt, data in pbar:
-            if cnt >= 1000:
-                break
-            # Generate sentence
-            with torch.no_grad():
-                with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
-                    if torch.cuda.device_count() > 1:
-                        output_ids = Model.module.greedy_search(
-                            data['image'].to(args.device))
+            if (log_global_step + 1) % args.validation_steps == 0:
+                Model.eval()
+                # Validation loop
+                clip_scores = []
+                for cnt, (img, name) in tqdm(enumerate(valid_set), total=1000):
+                    if cnt >= 1000:
+                        break
+                    # Generate sentence
+                    with torch.no_grad():
+                        with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
+                            if torch.cuda.device_count() > 1:
+                                output_ids = Model.module.greedy_search(
+                                    img.to(args.device))
+                            else:
+                                output_ids = Model.greedy_search(
+                                    img.to(args.device))
+                    gen_sentence = tokenizer.decode(output_ids)
+
+                    # Preprocess clip features
+                    raw_image = Image.open(
+                        args.valid_image_dir / f"{name}.jpg").convert('RGB')
+                    clip_image = image_process(
+                        raw_image).unsqueeze(0).to(args.device)
+                    text = clip.tokenize(gen_sentence).to(args.device)
+
+                    if cnt == 0:
+                        fig, axes = plt.subplots(3, 1, figsize=(20, 15))
+                    if cnt < 3:
+                        axes[cnt].imshow(raw_image)
+                        axes[cnt].set_title(gen_sentence)
+                    if cnt == 2:
+                        writer.add_figure('validation/samples',
+                                          fig, global_step=log_global_step)
+
+                    # Calculate similarity
+                    with torch.no_grad():
+                        image_features = model.encode_image(clip_image)
+                        text_features = model.encode_text(text)
+                    image_features /= image_features.norm(
+                        dim=-1, keepdim=True)
+                    text_features /= text_features.norm(
+                        dim=-1, keepdim=True)
+                    sim = image_features @ text_features.T
+                    score = 2.5 * max(sim.item(), 0)
+                    clip_scores.append(score)
+                clip_score = sum(clip_scores) / len(clip_scores)
+
+                writer.add_scalar("validation/CLIPscore",
+                                  clip_score, global_step=epoch)
+                if clip_score > history_best_CLIPscore:
+                    history_best_CLIPscore = clip_score
+                    if isinstance(Model, torch.nn.DataParallel):
+                        torch.save(Model.module.state_dict(),
+                                   args.ckpt_dir / "Best_CLIPs_model.pth")
                     else:
-                        output_ids = Model.greedy_search(
-                            data['image'].to(args.device))
-            gen_sentence = tokenizer.decode(output_ids)
+                        torch.save(Model.state_dict(),
+                                   args.ckpt_dir / "Best_CLIPs_model.pth")
+                    print(f'saved model with CLIPs={clip_score}')
 
-            # Preprocess clip features
-            clip_image = Image.open(
-                args.valid_image_dir / f"{data['filename']}.jpg").convert('RGB')
-            clip_image = image_process(
-                clip_image).unsqueeze(0).to(args.device)
-            text = clip.tokenize(gen_sentence).to(args.device)
+                # va_losses = []
+                # for data in tqdm(valid_loader):
+                #     data['images'] = data['images'].to(args.device, non_blocking=True)
+                #     data['input_ids'] = data['input_ids'].to(
+                #         args.device, non_blocking=True)
 
-            # Calculate similarity
-            with torch.no_grad():
-                image_features = model.encode_image(clip_image)
-                text_features = model.encode_text(text)
-            image_features /= image_features.norm(
-                dim=-1, keepdim=True)
-            text_features /= text_features.norm(
-                dim=-1, keepdim=True)
-            sim = image_features @ text_features.T
-            score = 2.5 * max(sim.item(), 0)
-            clip_scores.append(score)
-        clip_score = sum(clip_scores) / len(clip_scores)
+                #     with torch.no_grad():
+                #         with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
+                #             loss = Model(
+                #                 batch_image=data['images'],
+                #                 input_ids=data['input_ids']
+                #             )
+                #             loss = loss.mean()
+                #     va_losses.append(loss.item())
 
-        writer.add_scalar("validation/CLIPscore",
-                          clip_score, global_step=epoch)
-        if clip_score > history_best_CLIPscore:
-            history_best_CLIPscore = clip_score
-            if isinstance(Model, torch.nn.DataParallel):
-                torch.save(Model.module.state_dict(),
-                           args.ckpt_dir / "Best_CLIPs_model.pth")
-            else:
-                torch.save(Model.state_dict(),
-                           args.ckpt_dir / "Best_CLIPs_model.pth")
-            print(f'saved model with CLIPs={clip_score}')
+                # va_loss = sum(va_losses) / len(va_losses)
+                # writer.add_scalar("validation/loss", va_loss, global_step=epoch)
 
-        va_losses = []
-        for data in tqdm(valid_loader):
-            data['images'] = data['images'].to(args.device, non_blocking=True)
-            data['input_ids'] = data['input_ids'].to(
-                args.device, non_blocking=True)
-
-            with torch.no_grad():
-                with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
-                    loss = Model(
-                        batch_image=data['images'],
-                        input_ids=data['input_ids']
-                    )
-                    loss = loss.mean()
-            va_losses.append(loss.item())
-
-        va_loss = sum(va_losses) / len(va_losses)
-        writer.add_scalar("validation/loss", va_loss, global_step=epoch)
-
-        Model.train()
-        # Callback
-        if va_loss < history_best_valoss:
-            history_best_valoss = va_loss
-            if isinstance(Model, torch.nn.DataParallel):
-                torch.save(Model.module.state_dict(),
-                           args.ckpt_dir / "Best_valoss_model.pth")
-            else:
-                torch.save(Model.state_dict(),
-                           args.ckpt_dir / "Best_valoss_model.pth")
-            print(f'saved model with valoss={clip_score}')
+                # # Callback
+                # if va_loss < history_best_valoss:
+                #     history_best_valoss = va_loss
+                #     if isinstance(Model, torch.nn.DataParallel):
+                #         torch.save(Model.module.state_dict(),
+                #                    args.ckpt_dir / "Best_valoss_model.pth")
+                #     else:
+                #         torch.save(Model.state_dict(),
+                #                    args.ckpt_dir / "Best_valoss_model.pth")
+                #     print(f'saved model with valoss={va_loss}')
+                Model.train()
 
 
 def parse():
@@ -246,7 +243,7 @@ def parse():
     parser.add_argument('--valid_info', type=pathlib.Path,
                         default='hw3_data/p2_data/val.json')
     parser.add_argument('--model', type=str,
-                        default='beitv2_large_patch16_224_in22k')  #
+                        default='vit_base_patch32_224_clip_laion2b')  #
     parser.add_argument('--tokenizer', type=str,
                         default='./hw3_data/caption_tokenizer.json')
     parser.add_argument('--device', type=torch.device,
@@ -265,6 +262,7 @@ def parse():
     parser.add_argument("--lr", type=float, default=5e-5)
     parser.add_argument("--warmup_steps", type=int, default=1000)
     parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--validation_steps", type=int, default=500)
 
     args = parser.parse_args()
     return args

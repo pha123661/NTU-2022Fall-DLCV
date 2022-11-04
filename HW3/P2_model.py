@@ -22,7 +22,8 @@ class ImageCaptioningTransformer(nn.Module):
         self.word_embedding = nn.Embedding(vocab_size, d_model, padding_idx=0)
         self.positional_embedding = PositionalEmbedding(d_model=d_model)
 
-        self.encoder = timm.create_model(encoder, pretrained=True)
+        self.encoder = timm.create_model(
+            encoder, pretrained=True, num_classes=0)
         decoder_layer = nn.TransformerDecoderLayer(
             d_model=d_model,
             nhead=nhead,
@@ -69,6 +70,7 @@ class ImageCaptioningTransformer(nn.Module):
         return mask
 
     def greedy_search(self, img, max_length=30):
+        self.eval()
         if img.dim() < 4:
             img = img.unsqueeze(0)
         device = img.device
@@ -87,61 +89,6 @@ class ImageCaptioningTransformer(nn.Module):
                 break
             current_state = torch.concat((current_state, next_word), dim=-1)
         return current_state[0, 1:].cpu().tolist()  # remove [BOS]
-
-    # def batch_greedy_search(self, batch_img, max_length=30):
-    #     device = batch_img.device
-    #     batch_size = batch_img.shape[0]
-    #     with torch.no_grad():
-    #         memory = self.encoder.forward_features(batch_img)
-
-    #     current_state = torch.tensor([self.BOS_Token]).to(
-    #         device).unsqueeze(0).repeat(batch_size, 1)
-
-    #     done_idx = [-1] * batch_size
-
-    #     for _ in range(max_length):
-    #         in_embed = self.word_embedding(current_state)
-    #         in_embed += self.positional_embedding(in_embed)
-
-    #         with torch.no_grad():
-    #             logits = self.decoder(tgt=in_embed, memory=memory)
-    #             logits = self.head(logits[:, -1, :])
-    #         next_word = logits.argmax(dim=-1).unsqueeze(1)
-    #         current_state = torch.concat((current_state, next_word), dim=-1)
-
-    #         for idx, token_id in enumerate(current_state[:, -1]):
-    #             if token_id == self.EOS_Token:
-    #                 done_idx[idx] = idx
-
-    #         if all(i != -1 for i in done_idx):
-    #             break
-
-    #     current_state = current_state.cpu().tolist()
-
-    #     ret = []
-    #     for end_idx, seq in zip(done_idx, current_state):
-    #         ret.append(seq[1:end_idx])
-
-    #     return ret
-        # memory_beam = memory.detach().repeat(beam_size, 1, 1)
-        # beam = Beam(
-        #     beam_size=beam_size,
-        #     min_length=0,
-        #     n_top=num_candidates,
-        #     ranker=None,
-        # )
-
-        # for _ in range(max_length):
-        #     new_input_ids = beam.get_current_state().unsqueeze(1)
-        #     in_embed = self.word_embedding(new_input_ids)
-        #     in_embed += self.positional_embedding(in_embed)
-        #     with torch.no_grad():
-        #         decoder_outputs = self.decoder(
-        #             tgt=in_embed, memory=memory_beam)
-        #         # decoder_outputs.shape = (B, seq_len, vocab)
-        #     print(
-        #         self.decoder.layers)
-        #     break
 
 
 class PositionalEmbedding(nn.Module):
@@ -173,9 +120,9 @@ if __name__ == "__main__":
     from timm.data import resolve_data_config
     from timm.data.transforms_factory import create_transform
     from tokenizers import Tokenizer
+    from torch.utils.data import DataLoader
 
     from ICDataset import ICDataset
-    from torch.utils.data import DataLoader
     Transformer = ImageCaptioningTransformer(
         vocab_size=18022,
         encoder="beitv2_large_patch16_224_in22k",
