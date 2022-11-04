@@ -1,16 +1,14 @@
 import argparse
-import glob
 import json
 import os
 import pathlib
 
 import torch
-from language_evaluation import CocoEvaluator
 from PIL import Image
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from tokenizers import Tokenizer
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
 from P2_model import ImageCaptioningTransformer
@@ -37,38 +35,79 @@ def main(args):
     tokenizer = Tokenizer.from_file(args.tokenizer)
     transform = create_transform(**resolve_data_config({}, model=args.model))
     valid_set = Image_dataset(
-        root=args.valid_image_dir,
+        root=args.image_dir,
         transform=transform,
     )
-    # valid_loader = DataLoader(valid_set, 2 * args.batch_size,
-    #                           collate_fn=valid_set.collate_fn,
-    #                           shuffle=False,
-    #                           num_workers=4,
-    #                           pin_memory=True)
     Transformer = ImageCaptioningTransformer(
         **json.load((args.ckpt_dir / "model_config.json").open(mode='r'))
     ).to(args.device)
     Transformer.load_state_dict(torch.load(
-        args.ckpt_dir / "Best_model.pth", map_location=args.device))
+        args.ckpt_dir / "Best_CLIPs_model.pth", map_location=args.device))
     Transformer.eval()
 
-    pred = dict()
+    preds = dict()
     for data, name in tqdm(valid_set):
         output_ids = Transformer.greedy_search(data.to(args.device))
         sentence = tokenizer.decode(output_ids)
-        pred[name] = sentence
+        preds[name] = sentence
 
-    json.dump(pred, args.output_json.open(mode='w'), indent=4)
+    json.dump(preds, args.output_json.open(mode='w'), indent=4)
+
+    if args.do_eval:
+        from collections import defaultdict
+
+        import clip
+        import language_evaluation
+
+        # CLIP score
+        model, image_process = clip.load('ViT-B/32', device=args.device)
+        clip_scores = []
+        for image_name, text in tqdm(preds.items()):
+            image = Image.open(
+                args.image_dir / f"{image_name}.jpg").convert('RGB')
+            image = image_process(image).unsqueeze(0).to(args.device)
+            text = clip.tokenize(text).to(args.device)
+
+            with torch.no_grad():
+                image_features = model.encode_image(image)
+                image_features /= image_features.norm(dim=-1, keepdim=True)
+                text_features = model.encode_text(text)
+                text_features /= text_features.norm(dim=-1, keepdim=True)
+
+            sim = image_features @ text_features.T
+            score = 2.5 * max(sim.item(), 0)
+            clip_scores.append(score)
+
+        clip_score = sum(clip_scores) / len(clip_scores)
+        print(f'clip score={clip_score}')
+
+        # CIDEr score
+        evaluator = language_evaluation.CocoEvaluator(coco_types=['CIDEr'])
+        info = json.load(args.info_json.open(mode='r'))
+        annotations = defaultdict(list)
+        for data in info['annotations']:
+            annotations[data['image_id']].append(data['caption'])
+        img2id = {os.path.splitext(data['file_name'])[0]: data['id']
+                  for data in info['images']}
+
+        all_preds = []
+        all_ans = []
+        for image_name, text in preds.items():
+            all_ans.append(annotations[img2id[image_name]])
+            all_preds.append(text)
+        CIDEr_score = evaluator.run_evaluation(
+            all_preds, all_ans)['CIDEr']
+        print(f'CIDEr score={CIDEr_score}')
 
 
 def parse():
     parser = argparse.ArgumentParser()
 
     # Environment
-    parser.add_argument('--valid_image_dir', type=pathlib.Path,
+    parser.add_argument('--image_dir', type=pathlib.Path,
                         default='hw3_data/p2_data/images/val')
-    # parser.add_argument('--valid_info', type=pathlib.Path,
-    #                     default='hw3_data/p2_data/val.json')
+    parser.add_argument('--info_json', type=pathlib.Path,
+                        default='hw3_data/p2_data/val.json')
     parser.add_argument('--model', type=str,
                         default='vit_base_patch16_224')
     parser.add_argument('--tokenizer', type=str,
@@ -81,8 +120,9 @@ def parse():
     # Output Path
     parser.add_argument('--output_json', type=pathlib.Path)
 
-    # Training args
+    # Validation args
     parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--do_eval", action="store_true")
 
     args = parser.parse_args()
     return args
