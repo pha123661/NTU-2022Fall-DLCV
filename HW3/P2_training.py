@@ -56,15 +56,17 @@ def main(args):
     #                           pin_memory=True)
     if 'base' in args.model:
         d_model = 768
+        nhead = 12
     elif 'large' in args.model:
         d_model = 1024
+        nhead = 16
     else:
         raise Exception(f"Cannot auto config {args.model}")
     Model = ImageCaptioningTransformer(
         vocab_size=tokenizer.get_vocab_size(),
         encoder=args.model,
-        num_layers=4,
-        nhead=4,
+        num_layers=args.num_layers,
+        nhead=nhead,
         d_model=d_model,
         dropout=0.1,
     )
@@ -268,8 +270,6 @@ def parse():
                         default='hw3_data/p2_data/train.json')
     parser.add_argument('--valid_info', type=pathlib.Path,
                         default='hw3_data/p2_data/val.json')
-    parser.add_argument('--model', type=str,
-                        default='vit_base_patch32_224_clip_laion2b')  #
     parser.add_argument('--tokenizer', type=str,
                         default='./hw3_data/caption_tokenizer.json')
     parser.add_argument('--device', type=torch.device,
@@ -289,6 +289,11 @@ def parse():
     parser.add_argument("--warmup_steps", type=int, default=1000)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--validation_steps", type=int, default=500)
+
+    # Model
+    parser.add_argument('--model', type=str,
+                        default='vit_base_patch32_224_clip_laion2b')
+    parser.add_argument("--num_layers", type=int, default=6)
 
     args = parser.parse_args()
     return args
