@@ -118,7 +118,7 @@ def parse():
                         type=pathlib.Path, default="./P2_ckpt")
 
     # Output Path
-    parser.add_argument('--output_json', type=pathlib.Path)
+    parser.add_argument('--output_json', type=pathlib.Path, required=True)
 
     # Validation args
     parser.add_argument("--batch_size", type=int, default=64)
