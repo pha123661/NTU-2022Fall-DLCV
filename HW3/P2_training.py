@@ -3,16 +3,16 @@ import json
 import pathlib
 import shutil
 
-from PIL import Image
 import clip
 import torch
+from PIL import Image
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from tokenizers import Tokenizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard.writer import SummaryWriter
-from tqdm.auto import tqdm
 from torchvision import transforms
+from tqdm.auto import tqdm
 
 from ICDataset import ICDataset
 from P2_model import ImageCaptioningTransformer
@@ -59,7 +59,7 @@ def main(args):
         Model = ImageCaptioningTransformer(
             vocab_size=tokenizer.get_vocab_size(),
             encoder=args.model,
-            num_layers=6,
+            num_layers=12,
             nhead=12,
             d_model=768,
             dropout=0.1,
@@ -77,7 +77,8 @@ def main(args):
         raise Exception(f"Cannot auto config {args.model}")
     json.dump(Model.config, (args.ckpt_dir /
               f"model_config.json").open(mode='w'), indent=4)
-
+    print(
+        f"## Model #param={sum(p.numel() for p in Model.parameters() if p.requires_grad) / 1e6}M")
     if torch.cuda.device_count() > 1:
         Model = torch.nn.DataParallel(Model)
     Model = Model.to(args.device)
@@ -213,6 +214,7 @@ def main(args):
                         batch_image=data['images'],
                         input_ids=data['input_ids']
                     )
+                    loss = loss.mean()
             va_losses.append(loss.item())
 
         va_loss = sum(va_losses) / len(va_losses)
