@@ -193,7 +193,7 @@ def main(args):
                     score = 2.5 * max(sim.item(), 0)
                     clip_scores.append(score)
                 clip_score = sum(clip_scores) / len(clip_scores)
-
+                print(f'CLIP score={clip_score}')
                 writer.add_scalar("validation/CLIPscore",
                                   clip_score, global_step=log_global_step)
                 if clip_score > history_best_CLIPscore:
