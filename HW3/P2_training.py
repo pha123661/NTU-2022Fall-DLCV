@@ -48,12 +48,7 @@ def main(args):
                               shuffle=True,
                               num_workers=4,
                               pin_memory=True)
-    # valid_loader = DataLoader(valid_set,
-    #                           batch_size=2 * args.batch_size,
-    #                           collate_fn=valid_set.collate_fn,
-    #                           shuffle=False,
-    #                           num_workers=4
-    #                           pin_memory=True)
+
     if 'base' in args.model:
         d_model = 768
         nhead = 12
@@ -62,6 +57,8 @@ def main(args):
         nhead = 16
     else:
         raise Exception(f"Cannot auto config {args.model}")
+    if args.nhead is not None:
+        nhead = args.nhead
     Model = ImageCaptioningTransformer(
         vocab_size=tokenizer.get_vocab_size(),
         encoder=args.model,
@@ -70,8 +67,6 @@ def main(args):
         d_model=d_model,
         dropout=0.1,
     )
-    json.dump(Model.config, (args.ckpt_dir /
-              f"model_config.json").open(mode='w'), indent=4)
     print(
         f"## Model #param={sum(p.numel() for p in Model.parameters() if p.requires_grad) / 1e6}M")
     Model = Model.to(args.device)
@@ -95,10 +90,11 @@ def main(args):
     log_global_step = 0
     history_best_CLIPscore = 0
     history_best_CIDEr = 0
-    history_best_valoss = 10e10
     if args.tensorboard_path.exists():
         shutil.rmtree(args.tensorboard_path)
     writer = SummaryWriter(args.tensorboard_path)
+
+    # clip
     model, image_process = clip.load("ViT-B/32", device=args.device)
 
     # Misc
@@ -199,12 +195,10 @@ def main(args):
                                   clip_score, global_step=log_global_step)
                 if clip_score > history_best_CLIPscore:
                     history_best_CLIPscore = clip_score
-                    if isinstance(Model, torch.nn.DataParallel):
-                        torch.save(Model.module.state_dict(),
-                                   args.ckpt_dir / "Best_CLIPs_model.pth")
-                    else:
-                        torch.save(Model.state_dict(),
-                                   args.ckpt_dir / "Best_CLIPs_model.pth")
+                    torch.save(Model.state_dict(),
+                               args.ckpt_dir / "CLIPscore" / "Best_model.pth")
+                    json.dump(Model.config, (args.ckpt_dir / "CLIPscore" /
+                                             f"model_config.json").open(mode='w'), indent=4)
                     print(f'saved model with CLIPs={clip_score}')
 
                 all_preds = []
@@ -219,42 +213,13 @@ def main(args):
                                   CIDEr_score, global_step=log_global_step)
 
                 if CIDEr_score > history_best_CIDEr:
-                    history_best_CIDEr = clip_score
-                    if isinstance(Model, torch.nn.DataParallel):
-                        torch.save(Model.module.state_dict(),
-                                   args.ckpt_dir / "Best_CIDEr_model.pth")
-                    else:
-                        torch.save(Model.state_dict(),
-                                   args.ckpt_dir / "Best_CIDEr_model.pth")
+                    history_best_CIDEr = CIDEr_score
+                    torch.save(Model.state_dict(),
+                               args.ckpt_dir / "CIDEr" / "Best_model.pth")
+                    json.dump(Model.config, (args.ckpt_dir / "CIDEr" /
+                                             f"model_config.json").open(mode='w'), indent=4)
                     print(f'saved model with CIDEr={CIDEr_score}')
 
-                # va_losses = []
-                # for data in tqdm(valid_loader):
-                #     data['images'] = data['images'].to(args.device, non_blocking=True)
-                #     data['input_ids'] = data['input_ids'].to(
-                #         args.device, non_blocking=True)
-
-                #     with torch.no_grad():
-                #         with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
-                #             loss = Model(
-                #                 batch_image=data['images'],
-                #                 input_ids=data['input_ids']
-                #             )
-                #     va_losses.append(loss.item())
-
-                # va_loss = sum(va_losses) / len(va_losses)
-                # writer.add_scalar("validation/loss", va_loss, global_step=epoch)
-
-                # # Callback
-                # if va_loss < history_best_valoss:
-                #     history_best_valoss = va_loss
-                #     if isinstance(Model, torch.nn.DataParallel):
-                #         torch.save(Model.module.state_dict(),
-                #                    args.ckpt_dir / "Best_valoss_model.pth")
-                #     else:
-                #         torch.save(Model.state_dict(),
-                #                    args.ckpt_dir / "Best_valoss_model.pth")
-                #     print(f'saved model with valoss={va_loss}')
                 Model.train()
 
 
@@ -292,8 +257,9 @@ def parse():
 
     # Model
     parser.add_argument('--model', type=str,
-                        default='vit_base_patch32_224_clip_laion2b')
+                        default='vit_large_patch16_224')
     parser.add_argument("--num_layers", type=int, default=6)
+    parser.add_argument("--nhead", type=int, default=None)
 
     args = parser.parse_args()
     return args
