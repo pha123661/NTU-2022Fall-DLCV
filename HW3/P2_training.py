@@ -150,80 +150,79 @@ def main(args):
 
             log_global_step += 1
 
-            if (log_global_step + 1) % args.validation_steps == 0:
-                preds = dict()
-                Model.eval()
-                # Validation loop
-                clip_scores = []
-                for cnt, (img, name) in tqdm(enumerate(valid_set), total=len(valid_set)):
+        preds = dict()
+        Model.eval()
+        # Validation loop
+        clip_scores = []
+        for cnt, (img, name) in tqdm(enumerate(valid_set), total=len(valid_set)):
 
-                    # Generate sentence
-                    with torch.no_grad():
-                        with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
-                            output_ids = Model.greedy_search(
-                                img.to(args.device))
-                    gen_sentence = tokenizer.decode(output_ids)
-                    preds[name] = gen_sentence
+            # Generate sentence
+            with torch.no_grad():
+                with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
+                    output_ids = Model.greedy_search(
+                        img.to(args.device))
+            gen_sentence = tokenizer.decode(output_ids)
+            preds[name] = gen_sentence
 
-                    # Preprocess clip features
-                    raw_image = Image.open(
-                        args.valid_image_dir / f"{name}.jpg").convert('RGB')
-                    clip_image = image_process(
-                        raw_image).unsqueeze(0).to(args.device)
-                    text = clip.tokenize(gen_sentence).to(args.device)
+            # Preprocess clip features
+            raw_image = Image.open(
+                args.valid_image_dir / f"{name}.jpg").convert('RGB')
+            clip_image = image_process(
+                raw_image).unsqueeze(0).to(args.device)
+            text = clip.tokenize(gen_sentence).to(args.device)
 
-                    if cnt == 0:
-                        fig, axes = plt.subplots(3, 1, figsize=(15, 15))
-                    if cnt < 3:
-                        axes[cnt].imshow(raw_image)
-                        axes[cnt].set_title(gen_sentence)
-                    if cnt == 2:
-                        writer.add_figure('validation/samples',
-                                          fig, global_step=log_global_step)
+            if cnt == 0:
+                fig, axes = plt.subplots(3, 1, figsize=(15, 15))
+            if cnt < 3:
+                axes[cnt].imshow(raw_image)
+                axes[cnt].set_title(gen_sentence)
+            if cnt == 2:
+                writer.add_figure('validation/samples',
+                                  fig, global_step=epoch)
 
-                    # Calculate similarity
-                    with torch.no_grad():
-                        image_features = model.encode_image(clip_image)
-                        text_features = model.encode_text(text)
-                    image_features /= image_features.norm(
-                        dim=-1, keepdim=True)
-                    text_features /= text_features.norm(
-                        dim=-1, keepdim=True)
-                    sim = image_features @ text_features.T
-                    score = 2.5 * max(sim.item(), 0)
-                    clip_scores.append(score)
-                clip_score = sum(clip_scores) / len(clip_scores)
-                print(f'CLIP score={clip_score}')
-                writer.add_scalar("validation/CLIPscore",
-                                  clip_score, global_step=log_global_step)
-                if clip_score > history_best_CLIPscore:
-                    history_best_CLIPscore = clip_score
-                    torch.save(Model.state_dict(),
-                               args.ckpt_dir / "CLIPscore" / "Best_model.pth")
-                    json.dump(Model.config, (args.ckpt_dir / "CLIPscore" /
-                                             f"model_config.json").open(mode='w'), indent=4)
-                    print(f'saved model with CLIPs={clip_score}')
+            # Calculate similarity
+            with torch.no_grad():
+                image_features = model.encode_image(clip_image)
+                text_features = model.encode_text(text)
+            image_features /= image_features.norm(
+                dim=-1, keepdim=True)
+            text_features /= text_features.norm(
+                dim=-1, keepdim=True)
+            sim = image_features @ text_features.T
+            score = 2.5 * max(sim.item(), 0)
+            clip_scores.append(score)
+        clip_score = sum(clip_scores) / len(clip_scores)
+        print(f'CLIP score={clip_score}')
+        writer.add_scalar("validation/CLIPscore",
+                          clip_score, global_step=epoch)
+        if clip_score > history_best_CLIPscore:
+            history_best_CLIPscore = clip_score
+            torch.save(Model.state_dict(),
+                       args.ckpt_dir / "CLIPscore" / "Best_model.pth")
+            json.dump(Model.config, (args.ckpt_dir / "CLIPscore" /
+                                     f"model_config.json").open(mode='w'), indent=4)
+            print(f'saved model with CLIPs={clip_score}')
 
-                all_preds = []
-                all_ans = []
-                for image_name, text in preds.items():
-                    all_ans.append(annotations[img2id[image_name]])
-                    all_preds.append(text)
-                CIDEr_score = evaluator.run_evaluation(
-                    all_preds, all_ans)['CIDEr']
-                print(f'CIDEr score={CIDEr_score}')
-                writer.add_scalar("validation/CIDEr",
-                                  CIDEr_score, global_step=log_global_step)
+        all_preds = []
+        all_ans = []
+        for image_name, text in preds.items():
+            all_ans.append(annotations[img2id[image_name]])
+            all_preds.append(text)
+        CIDEr_score = evaluator.run_evaluation(
+            all_preds, all_ans)['CIDEr']
+        print(f'CIDEr score={CIDEr_score}')
+        writer.add_scalar("validation/CIDEr",
+                          CIDEr_score, global_step=epoch)
 
-                if CIDEr_score > history_best_CIDEr:
-                    history_best_CIDEr = CIDEr_score
-                    torch.save(Model.state_dict(),
-                               args.ckpt_dir / "CIDEr" / "Best_model.pth")
-                    json.dump(Model.config, (args.ckpt_dir / "CIDEr" /
-                                             f"model_config.json").open(mode='w'), indent=4)
-                    print(f'saved model with CIDEr={CIDEr_score}')
+        if CIDEr_score > history_best_CIDEr:
+            history_best_CIDEr = CIDEr_score
+            torch.save(Model.state_dict(),
+                       args.ckpt_dir / "CIDEr" / "Best_model.pth")
+            json.dump(Model.config, (args.ckpt_dir / "CIDEr" /
+                                     f"model_config.json").open(mode='w'), indent=4)
+            print(f'saved model with CIDEr={CIDEr_score}')
 
-                Model.train()
+        Model.train()
 
 
 def parse():
@@ -256,7 +255,6 @@ def parse():
     parser.add_argument("--lr", type=float, default=5e-5)
     parser.add_argument("--warmup_steps", type=int, default=1000)
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--validation_steps", type=int, default=500)
 
     # Model
     parser.add_argument('--model', type=str,
