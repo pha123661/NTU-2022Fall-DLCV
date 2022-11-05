@@ -170,7 +170,7 @@ def main(args):
                     text = clip.tokenize(gen_sentence).to(args.device)
 
                     if cnt == 0:
-                        fig, axes = plt.subplots(3, 1, figsize=(20, 15))
+                        fig, axes = plt.subplots(3, 1, figsize=(15, 15))
                     if cnt < 3:
                         axes[cnt].imshow(raw_image)
                         axes[cnt].set_title(gen_sentence)
