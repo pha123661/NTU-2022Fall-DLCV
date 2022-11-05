@@ -8,6 +8,7 @@ from collections import defaultdict
 import clip
 import language_evaluation
 import matplotlib.pyplot as plt
+import timm
 import torch
 from PIL import Image
 from timm.data import resolve_data_config
@@ -30,7 +31,11 @@ def main(args):
         transforms.RandomHorizontalFlip(),
         transforms.AutoAugment(),
     ])
-    transform = create_transform(**resolve_data_config({}, model=args.model))
+    transform_config = resolve_data_config(
+        {},
+        model=timm.create_model(args.model, pretrained=True, num_classes=0)
+    )
+    transform = create_transform(**transform_config)
     train_set = ICDataset(
         image_dir=args.train_image_dir,
         json_file=args.train_info,
@@ -192,7 +197,7 @@ def main(args):
             score = 2.5 * max(sim.item(), 0)
             clip_scores.append(score)
         clip_score = sum(clip_scores) / len(clip_scores)
-        print(f'CLIP score={clip_score}')
+        print(f'epoch {epoch}: CLIP score={clip_score}')
         writer.add_scalar("validation/CLIPscore",
                           clip_score, global_step=epoch)
         if clip_score > history_best_CLIPscore:
@@ -201,7 +206,7 @@ def main(args):
                        args.ckpt_dir / "CLIPscore" / "Best_model.pth")
             json.dump(Model.config, (args.ckpt_dir / "CLIPscore" /
                                      f"model_config.json").open(mode='w'), indent=4)
-            print(f'saved model with CLIPs={clip_score}')
+            print(f'## Saved model with CLIPs={clip_score}')
 
         all_preds = []
         all_ans = []
@@ -210,7 +215,7 @@ def main(args):
             all_preds.append(text)
         CIDEr_score = evaluator.run_evaluation(
             all_preds, all_ans)['CIDEr']
-        print(f'CIDEr score={CIDEr_score}')
+        print(f'epoch {epoch}: CIDEr score={CIDEr_score}')
         writer.add_scalar("validation/CIDEr",
                           CIDEr_score, global_step=epoch)
 
@@ -220,7 +225,7 @@ def main(args):
                        args.ckpt_dir / "CIDEr" / "Best_model.pth")
             json.dump(Model.config, (args.ckpt_dir / "CIDEr" /
                                      f"model_config.json").open(mode='w'), indent=4)
-            print(f'saved model with CIDEr={CIDEr_score}')
+            print(f'## Saved model with CIDEr={CIDEr_score}')
 
         Model.train()
 
