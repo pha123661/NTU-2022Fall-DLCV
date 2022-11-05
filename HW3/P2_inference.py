@@ -1,3 +1,4 @@
+import timm
 import argparse
 import json
 import os
@@ -35,7 +36,7 @@ def main(args):
     config = json.load((args.ckpt_dir / "model_config.json").open(mode='r'))
     tokenizer = Tokenizer.from_file(args.tokenizer)
     transform = create_transform(
-        **resolve_data_config({}, model=config['encoder']))
+        **resolve_data_config({}, model=timm.create_model(config['encoder'], pretrained=True, num_classes=0)))
     valid_set = Image_dataset(
         root=args.image_dir,
         transform=transform,
