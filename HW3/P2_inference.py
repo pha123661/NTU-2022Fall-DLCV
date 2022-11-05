@@ -32,22 +32,22 @@ class Image_dataset(Dataset):
 
 
 def main(args):
+    config = json.load((args.ckpt_dir / "model_config.json").open(mode='r'))
     tokenizer = Tokenizer.from_file(args.tokenizer)
-    transform = create_transform(**resolve_data_config({}, model=args.model))
+    transform = create_transform(
+        **resolve_data_config({}, model=config['encoder']))
     valid_set = Image_dataset(
         root=args.image_dir,
         transform=transform,
     )
-    Transformer = ImageCaptioningTransformer(
-        **json.load((args.ckpt_dir / "model_config.json").open(mode='r'))
-    ).to(args.device)
-    Transformer.load_state_dict(torch.load(
-        args.ckpt_dir / "Best_CLIPs_model.pth", map_location=args.device))
-    Transformer.eval()
+    Model = ImageCaptioningTransformer(**config).to(args.device)
+    Model.load_state_dict(torch.load(
+        args.ckpt_dir / "Best_model.pth", map_location=args.device))
+    Model.eval()
 
     preds = dict()
     for data, name in tqdm(valid_set):
-        output_ids = Transformer.greedy_search(data.to(args.device))
+        output_ids = Model.greedy_search(data.to(args.device))
         sentence = tokenizer.decode(output_ids)
         preds[name] = sentence
 
@@ -108,8 +108,6 @@ def parse():
                         default='hw3_data/p2_data/images/val')
     parser.add_argument('--info_json', type=pathlib.Path,
                         default='hw3_data/p2_data/val.json')
-    parser.add_argument('--model', type=str,
-                        default='vit_base_patch16_224')
     parser.add_argument('--tokenizer', type=str,
                         default='./hw3_data/caption_tokenizer.json')
     parser.add_argument('--device', type=torch.device,
@@ -118,7 +116,8 @@ def parse():
                         type=pathlib.Path, default="./P2_ckpt")
 
     # Output Path
-    parser.add_argument('--output_json', type=pathlib.Path, required=True)
+    parser.add_argument('--output_json', type=pathlib.Path,
+                        default='pred.json')
 
     # Validation args
     parser.add_argument("--batch_size", type=int, default=64)
