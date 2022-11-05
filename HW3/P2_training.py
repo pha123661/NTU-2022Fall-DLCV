@@ -26,16 +26,19 @@ from warmup_scheduler import GradualWarmupScheduler
 def main(args):
     # Preprocess
     tokenizer = Tokenizer.from_file(args.tokenizer)
-    # augmentation_transforms = transforms.Compose([
-    #     transforms.RandomHorizontalFlip(),
-    #     transforms.AutoAugment(),
-    # ])
+    augmentation_transforms = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.AutoAugment(),
+    ])
     transform = create_transform(**resolve_data_config({}, model=args.model))
     train_set = ICDataset(
         image_dir=args.train_image_dir,
         json_file=args.train_info,
-        transform=transform,
-        tokenizer=tokenizer
+        transform=transforms.Compose([
+            augmentation_transforms,
+            transform,
+        ]),
+        tokenizer=tokenizer,
     )
     valid_set = Image_dataset(
         root=args.valid_image_dir,
@@ -268,4 +271,6 @@ def parse():
 if __name__ == '__main__':
     args = parse()
     args.ckpt_dir.mkdir(exist_ok=True, parents=True)
+    (args.ckpt_dir / "CLIPscore").mkdir(exist_ok=True, parents=True)
+    (args.ckpt_dir / "CIDEr").mkdir(exist_ok=True, parents=True)
     main(args)
