@@ -41,9 +41,10 @@ def main(args):
         root=args.image_dir,
         transform=transform,
     )
-    Model = ImageCaptioningTransformer(**config).to(args.device)
+    Model = ImageCaptioningTransformer(**config)
     Model.load_state_dict(torch.load(
         args.ckpt_dir / "Best_model.pth", map_location=args.device))
+    Model.to(args.device)
     Model.eval()
 
     preds = dict()
@@ -107,8 +108,6 @@ def parse():
     # Environment
     parser.add_argument('--image_dir', type=pathlib.Path,
                         default='hw3_data/p2_data/images/val')
-    parser.add_argument('--info_json', type=pathlib.Path,
-                        default='hw3_data/p2_data/val.json')
     parser.add_argument('--tokenizer', type=str,
                         default='./hw3_data/caption_tokenizer.json')
     parser.add_argument('--device', type=torch.device,
@@ -121,8 +120,9 @@ def parse():
                         default='pred.json')
 
     # Validation args
-    parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--do_eval", action="store_true")
+    parser.add_argument('--info_json', type=pathlib.Path,
+                        default='hw3_data/p2_data/val.json')
 
     args = parser.parse_args()
     return args
