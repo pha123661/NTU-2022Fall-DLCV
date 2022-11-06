@@ -1,9 +1,9 @@
-import timm
 import argparse
 import json
 import os
 import pathlib
 
+import timm
 import torch
 from PIL import Image
 from timm.data import resolve_data_config
