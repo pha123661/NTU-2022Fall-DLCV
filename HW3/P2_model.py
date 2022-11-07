@@ -4,8 +4,6 @@ import timm
 import torch
 from torch import nn
 
-from beam_search import Beam
-
 
 class ImageCaptioningTransformer(nn.Module):
     BOS_Token = 2
