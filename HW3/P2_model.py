@@ -9,7 +9,7 @@ class ImageCaptioningTransformer(nn.Module):
     BOS_Token = 2
     EOS_Token = 3
 
-    def __init__(self, vocab_size, encoder, num_layers, nhead, d_model, activation='gelu', batch_first=True, dropout=0.1) -> None:
+    def __init__(self, vocab_size, encoder, num_layers, nhead, d_model, activation='gelu', batch_first=True, dropout=0.1, pretrained=True) -> None:
         super().__init__()
         self.config = dict(locals())
         del self.config['self']
@@ -21,7 +21,7 @@ class ImageCaptioningTransformer(nn.Module):
         self.positional_embedding = PositionalEmbedding(d_model=d_model)
 
         self.encoder = timm.create_model(
-            encoder, pretrained=True, num_classes=0)
+            encoder, pretrained=pretrained, num_classes=0)
         decoder_layer = nn.TransformerDecoderLayer(
             d_model=d_model,
             nhead=nhead,

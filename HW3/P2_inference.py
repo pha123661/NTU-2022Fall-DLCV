@@ -45,6 +45,7 @@ def main(args):
         root=args.image_dir,
         transform=transform,
     )
+    config['pretrained'] = False
     Model = ImageCaptioningTransformer(**config)
     Model.load_state_dict(torch.load(
         args.ckpt_dir / "Best_model.pth", map_location=args.device))
