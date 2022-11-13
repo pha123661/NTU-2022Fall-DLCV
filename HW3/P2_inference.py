@@ -3,13 +3,11 @@ import json
 import os
 import pathlib
 
-import timm
 import torch
 from PIL import Image
-from timm.data import resolve_data_config
-from timm.data.transforms_factory import create_transform
 from tokenizers import Tokenizer
 from torch.utils.data import Dataset
+from torchvision import transforms
 from tqdm.auto import tqdm
 
 from P2_model import ImageCaptioningTransformer
@@ -35,8 +33,14 @@ class Image_dataset(Dataset):
 def main(args):
     config = json.load((args.ckpt_dir / "model_config.json").open(mode='r'))
     tokenizer = Tokenizer.from_file(args.tokenizer)
-    transform = create_transform(
-        **resolve_data_config({}, model=timm.create_model(config['encoder'], pretrained=True, num_classes=0)))
+    transform = transforms.Compose([
+        transforms.Resize(
+            224, interpolation=transforms.InterpolationMode.BICUBIC, max_size=None, antialias=None),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.4850, 0.4560, 0.4060], std=[
+                             0.2290, 0.2240, 0.2250])
+    ])
     valid_set = Image_dataset(
         root=args.image_dir,
         transform=transform,
