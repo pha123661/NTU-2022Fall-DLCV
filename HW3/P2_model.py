@@ -1,4 +1,5 @@
 import math
+import random
 
 import timm
 import torch
@@ -6,6 +7,8 @@ from torch import nn
 
 
 class ImageCaptioningTransformer(nn.Module):
+    PAD_Token = 0
+    UNK_Token = 1
     BOS_Token = 2
     EOS_Token = 3
 
@@ -17,7 +20,8 @@ class ImageCaptioningTransformer(nn.Module):
             if k.startswith('_'):
                 del self.config[k]
 
-        self.word_embedding = nn.Embedding(vocab_size, d_model, padding_idx=0)
+        self.word_embedding = nn.Embedding(
+            vocab_size, d_model, padding_idx=self.PAD_Token)
         self.positional_embedding = PositionalEmbedding(d_model=d_model)
 
         self.encoder = timm.create_model(
@@ -34,12 +38,51 @@ class ImageCaptioningTransformer(nn.Module):
             num_layers=num_layers,
         )
         self.head = nn.Linear(d_model, vocab_size)
-        self.criterion = nn.CrossEntropyLoss(ignore_index=0)
+        self.criterion = nn.CrossEntropyLoss(ignore_index=self.PAD_Token)
 
-    def forward(self, batch_image, input_ids):
+    def forward(self, batch_image, input_ids, sampleing_ratio=0):
         # encoder pass
         features = self.encoder.forward_features(
             batch_image)  # shape = (B, 14*14+1, d_model)
+
+        if sampleing_ratio > 0:
+            with torch.no_grad():
+                in_embed = self.word_embedding(input_ids[:, :-1])
+                in_embed += self.positional_embedding(in_embed)
+                mask = self._generate_square_subsequent_mask(
+                    in_embed.shape[1]).to(in_embed.device)
+                logits = self.decoder(
+                    tgt=in_embed, memory=features, tgt_mask=mask)
+                logits = self.head(logits)  # shape (B, seq_len, vocab)
+            pred_ids = logits.argmax(dim=-1)  # (B, seq_len)
+            # place BOS in pred
+            pred_ids = torch.cat(
+                [self.BOS_Token * torch.ones(pred_ids.shape[0], 1, dtype=input_ids.dtype).to(input_ids.device), pred_ids], dim=1)
+
+            # replace input_ids
+            '''
+            loop-style:
+            for batch_idx in range(input_ids.shape[0]):
+                for seq_idx in range(1, input_ids.shape[1]):
+                    if input_ids[batch_idx][seq_idx] == self.EOS_Token:  # EOS
+                        break
+                    if random.random() > sampleing_ratio:
+                        # pred_ids[B][0] = output of 0th word -> replaces the 1st word
+                        input_ids[batch_idx][seq_idx] = pred_ids[batch_idx][seq_idx]
+            '''
+            to_be_replaced = torch.rand_like(
+                pred_ids, dtype=float) > sampleing_ratio
+            # don't replace PAD and EOS
+            to_be_replaced = torch.logical_and(
+                to_be_replaced,
+                input_ids != self.PAD_Token
+            )
+            to_be_replaced = torch.logical_and(
+                to_be_replaced,
+                input_ids != self.EOS_Token
+            )
+            input_ids[to_be_replaced] = pred_ids[to_be_replaced]
+
         # word embedding + positional embedding
         # 0 ~ n-1 tokens as input
         in_embed = self.word_embedding(input_ids[:, :-1])

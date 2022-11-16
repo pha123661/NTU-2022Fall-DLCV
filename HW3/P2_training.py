@@ -24,6 +24,19 @@ from P2_model import ImageCaptioningTransformer
 from warmup_scheduler import GradualWarmupScheduler
 
 
+class ScheduledSampling:
+    def __init__(self, total_steps) -> None:
+        self.total_steps = total_steps
+        self.current_steps = 0
+
+    def step(self) -> float:
+        if self.current_steps >= self.total_steps:
+            return 0.0
+        ratio = (self.total_steps - self.current_steps) / self.total_steps
+        self.current_steps += 1
+        return ratio
+
+
 def main(args):
     # Preprocess
     tokenizer = Tokenizer.from_file(args.tokenizer)
@@ -95,6 +108,8 @@ def main(args):
         optimizer, T_max=args.epochs * len(train_loader) - args.warmup_steps)
     scheduler = GradualWarmupScheduler(
         optimizer, multiplier=1, total_epoch=args.warmup_steps, after_scheduler=cos_scheduler)
+    sample_scheduler = ScheduledSampling(
+        total_steps=args.epochs * len(train_loader))
     scaler = torch.cuda.amp.GradScaler(enabled=amp_enable)
 
     # Log/Validation
@@ -136,7 +151,8 @@ def main(args):
             with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
                 loss = model(
                     batch_image=data['images'],
-                    input_ids=data['input_ids']
+                    input_ids=data['input_ids'],
+                    sampleing_ratio=sample_scheduler.step(),
                 )
 
             # Update
