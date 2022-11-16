@@ -59,15 +59,15 @@ def main(args):
 
     if 'base' in args.model:
         d_model = 768
-        nhead = 12
+        nhead = 8
     elif 'large' in args.model:
         d_model = 1024
-        nhead = 16
+        nhead = 8
     else:
         raise Exception(f"Cannot auto config {args.model}")
     if args.nhead is not None:
         nhead = args.nhead
-    Model = ImageCaptioningTransformer(
+    model = ImageCaptioningTransformer(
         vocab_size=tokenizer.get_vocab_size(),
         encoder=args.model,
         num_layers=args.num_layers,
@@ -75,9 +75,12 @@ def main(args):
         d_model=d_model,
         dropout=0.1,
     )
+    # Freeze encoder
+    for param in model.encoder.parameters():
+        param.requires_grad = False
     print(
-        f"## Model #param={sum(p.numel() for p in Model.parameters() if p.requires_grad) / 1e6}M")
-    Model = Model.to(args.device)
+        f"## Model #param={sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6}M")
+    model = model.to(args.device)
 
     # Training
     amp_enable = any([args.fp16, args.bf16])
@@ -87,7 +90,7 @@ def main(args):
         print(
             f"Enable AMP training using dtype={amp_dtype} on {amp_device_type}")
 
-    optimizer = torch.optim.AdamW(Model.parameters(), lr=args.lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     cos_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=args.epochs * len(train_loader) - args.warmup_steps)
     scheduler = GradualWarmupScheduler(
@@ -103,7 +106,7 @@ def main(args):
     writer = SummaryWriter(args.tensorboard_path)
 
     # clip
-    model, image_process = clip.load("ViT-B/32", device=args.device)
+    clip_model, image_process = clip.load("ViT-B/32", device=args.device)
 
     # Misc
     optimizer.zero_grad(set_to_none=True)
@@ -131,7 +134,7 @@ def main(args):
 
             # Get loss
             with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
-                loss = Model(
+                loss = model(
                     batch_image=data['images'],
                     input_ids=data['input_ids']
                 )
@@ -140,7 +143,7 @@ def main(args):
             scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
             grad_norm = torch.nn.utils.clip_grad_norm_(
-                Model.parameters(), 1.0).detach().item()
+                model.parameters(), 1.0).detach().item()
             scaler.step(optimizer)
             scaler.update()
 
@@ -156,7 +159,7 @@ def main(args):
             log_global_step += 1
 
         preds = dict()
-        Model.eval()
+        model.eval()
         # Validation loop
         clip_scores = []
         for cnt, (img, name) in tqdm(enumerate(valid_set), total=len(valid_set)):
@@ -164,7 +167,7 @@ def main(args):
             # Generate sentence
             with torch.no_grad():
                 with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
-                    output_ids = Model.greedy_search(
+                    output_ids = model.greedy_search(
                         img.to(args.device))
             gen_sentence = tokenizer.decode(output_ids)
             preds[name] = gen_sentence
@@ -187,8 +190,8 @@ def main(args):
 
             # Calculate similarity
             with torch.no_grad():
-                image_features = model.encode_image(clip_image)
-                text_features = model.encode_text(text)
+                image_features = clip_model.encode_image(clip_image)
+                text_features = clip_model.encode_text(text)
             image_features /= image_features.norm(
                 dim=-1, keepdim=True)
             text_features /= text_features.norm(
@@ -202,9 +205,9 @@ def main(args):
                           clip_score, global_step=epoch)
         if clip_score > history_best_CLIPscore:
             history_best_CLIPscore = clip_score
-            torch.save(Model.state_dict(),
+            torch.save(model.state_dict(),
                        args.ckpt_dir / "CLIPscore" / "Best_model.pth")
-            json.dump(Model.config, (args.ckpt_dir / "CLIPscore" /
+            json.dump(model.config, (args.ckpt_dir / "CLIPscore" /
                                      f"model_config.json").open(mode='w'), indent=4)
             print(f'## Saved model with CLIPs={clip_score}')
 
@@ -221,13 +224,13 @@ def main(args):
 
         if CIDEr_score > history_best_CIDEr:
             history_best_CIDEr = CIDEr_score
-            torch.save(Model.state_dict(),
+            torch.save(model.state_dict(),
                        args.ckpt_dir / "CIDEr" / "Best_model.pth")
-            json.dump(Model.config, (args.ckpt_dir / "CIDEr" /
+            json.dump(model.config, (args.ckpt_dir / "CIDEr" /
                                      f"model_config.json").open(mode='w'), indent=4)
             print(f'## Saved model with CIDEr={CIDEr_score}')
 
-        Model.train()
+        model.train()
 
 
 def parse():
@@ -257,14 +260,14 @@ def parse():
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--bf16", action="store_true")
     parser.add_argument("--epochs", type=int, default=15)
-    parser.add_argument("--lr", type=float, default=5e-5)
+    parser.add_argument("--lr", type=float, default=3e-5)
     parser.add_argument("--warmup_steps", type=int, default=1000)
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=64)
 
     # Model
     parser.add_argument('--model', type=str,
-                        default='vit_large_patch16_224')
-    parser.add_argument("--num_layers", type=int, default=6)
+                        default='deit3_large_patch16_224_in21ft1k')
+    parser.add_argument("--num_layers", type=int, default=4)
     parser.add_argument("--nhead", type=int, default=None)
 
     args = parser.parse_args()
