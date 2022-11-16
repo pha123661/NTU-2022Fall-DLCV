@@ -2,7 +2,10 @@ import argparse
 import json
 import os
 import pathlib
+from collections import defaultdict
 
+import clip
+import language_evaluation
 import timm
 import torch
 from PIL import Image
@@ -13,8 +16,6 @@ from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
 from P2_model import ImageCaptioningTransformer
-from collections import defaultdict
-import language_evaluation
 
 
 class Image_dataset(Dataset):
@@ -69,16 +70,30 @@ def main(args):
     min_name = None
     max_value = 0
     max_name = None
-    for image_name, text in preds.items():
-        ans = annotations[img2id[image_name]]
-        pred = text
-        CIDEr_score = evaluator.run_evaluation([pred], [ans])['CIDEr']
-        if CIDEr_score > max_value:
-            max_value = CIDEr_score
-            max_name = image_name
-        if CIDEr_score < min_value:
-            min_value = CIDEr_score
+    # CLIP score
+    model, image_process = clip.load('ViT-B/32', device=args.device)
+
+    for image_name, text in tqdm(preds.items()):
+        image = Image.open(
+            args.image_dir / f"{image_name}.jpg").convert('RGB')
+        image = image_process(image).unsqueeze(0).to(args.device)
+        text = clip.tokenize(text).to(args.device)
+
+        with torch.no_grad():
+            image_features = model.encode_image(image)
+            image_features /= image_features.norm(dim=-1, keepdim=True)
+            text_features = model.encode_text(text)
+            text_features /= text_features.norm(dim=-1, keepdim=True)
+
+        sim = image_features @ text_features.T
+        score = 2.5 * max(sim.item(), 0)
+        if score < min_value:
+            min_value = score
             min_name = image_name
+        if score > max_value:
+            max_value = score
+            max_name = image_name
+
     print(f"Min {min_name}, {min_value}")
     print(f"Max {max_name}, {max_value}")
 
