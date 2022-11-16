@@ -54,8 +54,10 @@ def main(args):
 
     preds = dict()
     for data, name in tqdm(valid_set):
-        output_ids = Model.greedy_search(data.to(args.device))
-        sentence = tokenizer.decode(output_ids)
+        output_ids = Model.beam_search(data.to(args.device), beams=3)
+        sentence = tokenizer.decode(output_ids, skip_special_tokens=True)
+        if sentence[-1] == '.' and len(sentence) > 2:
+            sentence = sentence[:-2] + '.'  # remove white space before '.'
         preds[name] = sentence
 
     json.dump(preds, args.output_json.open(mode='w'), indent=4)
