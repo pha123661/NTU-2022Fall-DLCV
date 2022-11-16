@@ -183,6 +183,7 @@ class ImageCaptioningTransformer(nn.Module):
         exit()
         return current_state.cpu().tolist()
 
+    # reference: https://github.com/jarobyte91/pytorch_beam_search
     @torch.no_grad()
     def beam_search(self, img, beams=3, max_length=30):
         def forward_prob(memory, input_ids):
