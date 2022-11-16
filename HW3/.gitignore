@@ -3,3 +3,4 @@ hw3_data
 **out**
 .DLCV_HW3
 pred.json
+P2_beam_preds
