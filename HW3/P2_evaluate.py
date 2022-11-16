@@ -123,7 +123,8 @@ def main(args):
 if __name__ == "__main__":
     parser = ArgumentParser()
 
-    parser.add_argument("-p", "--pred_file", help="Prediction json file")
+    parser.add_argument("-p", "--pred_file",
+                        default="./pred.json", help="Prediction json file")
     parser.add_argument(
         "--images_root", default="hw3_data/p2_data/images/val/", help="Image root")
     parser.add_argument("--annotation_file",
