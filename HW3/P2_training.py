@@ -25,13 +25,13 @@ from warmup_scheduler import GradualWarmupScheduler
 
 
 class ScheduledSampling:
-    def __init__(self, total_steps) -> None:
+    def __init__(self, total_steps, enabled=True) -> None:
         self.total_steps = total_steps
         self.current_steps = 0
 
     def step(self) -> float:
-        if self.current_steps >= self.total_steps:
-            return 0.0
+        if not self.enabled or self.current_steps >= self.total_steps:
+            return 0
         ratio = (self.total_steps - self.current_steps) / self.total_steps
         self.current_steps += 1
         return ratio
@@ -109,7 +109,7 @@ def main(args):
     scheduler = GradualWarmupScheduler(
         optimizer, multiplier=1, total_epoch=args.warmup_steps, after_scheduler=cos_scheduler)
     sample_scheduler = ScheduledSampling(
-        total_steps=args.epochs * len(train_loader))
+        total_steps=args.epochs * len(train_loader), enabled=args.scheduled_sampling)
     scaler = torch.cuda.amp.GradScaler(enabled=amp_enable)
 
     # Log/Validation
@@ -275,6 +275,7 @@ def parse():
     # Training args
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--bf16", action="store_true")
+    parser.add_argument("--scheduled_sampling", action="store_true")
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument("--lr", type=float, default=3e-5)
     parser.add_argument("--warmup_steps", type=int, default=1000)
