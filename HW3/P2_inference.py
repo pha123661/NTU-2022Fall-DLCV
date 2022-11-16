@@ -56,7 +56,7 @@ def main(args):
     for data, name in tqdm(valid_set):
         output_ids = Model.beam_search(data.to(args.device), beams=3)
         sentence = tokenizer.decode(output_ids, skip_special_tokens=True)
-        if sentence[-1] == '.' and len(sentence) > 2:
+        if len(sentence) > 2 and sentence[-1] == '.':
             sentence = sentence[:-2] + '.'  # remove white space before '.'
         preds[name] = sentence
 
@@ -116,7 +116,7 @@ def parse():
     parser.add_argument('--image_dir', type=pathlib.Path,
                         default='hw3_data/p2_data/images/val')
     parser.add_argument('--tokenizer', type=str,
-                        default='./hw3_data/caption_tokenizer.json')
+                        default='./P2_ckpt/caption_tokenizer.json')
     parser.add_argument('--device', type=torch.device,
                         default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument("--ckpt_dir",
