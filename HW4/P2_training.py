@@ -18,8 +18,8 @@ def main(args):
         transforms.Resize(128),
         transforms.ToTensor(),
         transforms.Normalize(
-            mean=[0.4706, 0.4495, 0.4031],
-            std=[0.2176, 0.2152, 0.2150]
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225]
         )
     ])
 
@@ -32,11 +32,12 @@ def main(args):
         train_set, batch_size=args.batch_size, shuffle=True, num_workers=4
     )
 
-    resnet = models.resnet50(pretrained=False)
+    resnet = models.resnet50(weights=None)
     learner = BYOL(
         resnet,
         image_size=128,
-        hidden_layer='avgpool'
+        hidden_layer='avgpool',
+        use_momentum=False,
     ).to(args.device)
     # Training
     amp_enable = any([args.fp16, args.bf16])
@@ -79,7 +80,7 @@ def main(args):
             scaler.scale(loss).backward()
             scaler.step(optim)
             scaler.update()
-            learner.update_moving_average()  # update moving average of target encoder
+            # learner.update_moving_average()  # update moving average of target encoder
 
             # Log
             writer.add_scalar("training/lr",
@@ -111,10 +112,10 @@ def parse():
     # Training args
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--bf16", action="store_true")
-    parser.add_argument("--epochs", type=int, default=15)
-    parser.add_argument("--lr", type=float, default=3e-5)
-    parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--warmup_steps", type=int, default=1000)
+    parser.add_argument("--epochs", type=int, default=60)
+    parser.add_argument("--lr", type=float, default=4e-3)
+    parser.add_argument("--batch_size", type=int, default=256)
+    parser.add_argument("--warmup_steps", type=int, default=300)
 
     args = parser.parse_args()
     return args
