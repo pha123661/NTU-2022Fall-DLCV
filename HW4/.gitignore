@@ -1,3 +1,5 @@
 hw4_data
 logs
 *.json
+**tmp**
+P2_results
