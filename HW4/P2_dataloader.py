@@ -1,6 +1,6 @@
-import os
 import csv
 import glob
+import os
 
 import torch
 from PIL import Image
@@ -17,14 +17,15 @@ class ImageFolderDataset(Dataset):
             self.fname2label = dict()
             with open(label_csv, 'r') as f:
                 rows = csv.reader(f)
+                next(rows)
                 for row in rows:
                     self.fname2label[row[1]] = row[2]
             all_labels = sorted(set(self.fname2label.values()))
 
             self.label2idx = {v: k for k, v in enumerate(all_labels)}
             # import json
-            # with open('label2idx.json', 'w') as f:
-            #     json.dump(f, self.label2idx, indent=2)
+            # with open(os.path.join(os.path.dirname(label_csv), 'label2idx.json'), 'w') as f:
+            #     json.dump(self.label2idx, f, indent=2)
 
     def __getitem__(self, idx):
         data_dict = dict()
@@ -42,6 +43,7 @@ class ImageFolderDataset(Dataset):
 if __name__ == "__main__":
     from torchvision import transforms
     from tqdm import tqdm
+
     # calculates mean and std of training set
     train_transform = transforms.Compose([
         transforms.Resize(128),
@@ -49,9 +51,9 @@ if __name__ == "__main__":
     ])
 
     dst = ImageFolderDataset(
-        "hw4_data/mini/train",
+        "hw4_data/office/train",
         train_transform,
-        "hw4_data/mini/train.csv",
+        "hw4_data/office/train.csv",
     )
     mean = torch.zeros(3)
     std = torch.zeros(3)
