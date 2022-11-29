@@ -1,19 +1,18 @@
-import os
-import sys
-import copy
-import time
-import random
 import argparse
-from tqdm import tqdm, trange
+import copy
+import os
+import random
+import sys
+import time
 
-import mmcv
 import imageio
+import mmcv
 import numpy as np
-
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm, trange
 
-from lib import utils, dvgo, dcvgo, dmpigo
+from lib import dcvgo, dmpigo, dvgo, utils
 from lib.load_data import load_data
 
 
