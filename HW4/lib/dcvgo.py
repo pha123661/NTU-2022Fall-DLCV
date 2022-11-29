@@ -1,19 +1,18 @@
+import functools
 import os
 import time
-import functools
-import numpy as np
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torch.utils.cpp_extension import load
 from torch_scatter import segment_coo
 
 from . import grid
-from .dvgo import Raw2Alpha, Alphas2Weights
 from .dmpigo import create_full_step_id
+from .dvgo import Alphas2Weights, Raw2Alpha
 
-from torch.utils.cpp_extension import load
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 ub360_utils_cuda = load(
         name='ub360_utils_cuda',

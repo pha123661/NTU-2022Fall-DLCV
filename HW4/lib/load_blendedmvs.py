@@ -1,11 +1,12 @@
-import os
 import glob
-import torch
-import numpy as np
-import imageio
 import json
-import torch.nn.functional as F
+import os
+
 import cv2
+import imageio
+import numpy as np
+import torch
+import torch.nn.functional as F
 
 
 def load_blendedmvs_data(basedir):
@@ -28,9 +29,9 @@ def load_blendedmvs_data(basedir):
     path_intrinsics = os.path.join(basedir, 'intrinsics.txt')
     H, W = imgs[0].shape[:2]
     K = np.loadtxt(path_intrinsics)
-    focal = float(K[0,0])
+    focal = float(K[0, 0])
 
-    render_poses = torch.Tensor(np.loadtxt(os.path.join(basedir, 'test_traj.txt')).reshape(-1,4,4).astype(np.float32))
+    render_poses = torch.Tensor(np.loadtxt(os.path.join(
+        basedir, 'test_traj.txt')).reshape(-1, 4, 4).astype(np.float32))
 
     return imgs, poses, render_poses, [H, W, focal], K, i_split
-

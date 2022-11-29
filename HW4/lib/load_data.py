@@ -1,13 +1,13 @@
 import numpy as np
 
-from .load_llff import load_llff_data
-from .load_blender import load_blender_data
-from .load_nsvf import load_nsvf_data
 from .load_blendedmvs import load_blendedmvs_data
-from .load_tankstemple import load_tankstemple_data
-from .load_deepvoxels import load_dv_data
+from .load_blender import load_blender_data
 from .load_co3d import load_co3d_data
+from .load_deepvoxels import load_dv_data
+from .load_llff import load_llff_data
 from .load_nerfpp import load_nerfpp_data
+from .load_nsvf import load_nsvf_data
+from .load_tankstemple import load_tankstemple_data
 
 
 def load_data(args):

@@ -1,13 +1,13 @@
+import functools
 import os
 import time
-import functools
-import numpy as np
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from torch.utils.cpp_extension import load
+
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 render_utils_cuda = load(
         name='render_utils_cuda',

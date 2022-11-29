@@ -2,12 +2,14 @@
 Modify from
 https://github.com/Kai-46/nerfplusplus/blob/master/data_loader_split.py
 '''
-import os
 import glob
-import scipy
+import os
+
 import imageio
 import numpy as np
+import scipy
 import torch
+
 
 ########################################################################################################################
 # camera coordinate system: x-->right, y-->down, z-->scene (opencv/colmap convention)
@@ -33,11 +35,13 @@ def load_data_split(split_dir, skip=1, try_load_min_depth=True, only_img_files=F
         return np.array([float(x) for x in nums]).reshape([4, 4]).astype(np.float32)
 
     if only_img_files:
-        img_files = find_files('{}/rgb'.format(split_dir), exts=['*.png', '*.jpg'])
+        img_files = find_files('{}/rgb'.format(split_dir),
+                               exts=['*.png', '*.jpg'])
         return img_files
 
     # camera parameters files
-    intrinsics_files = find_files('{}/intrinsics'.format(split_dir), exts=['*.txt'])
+    intrinsics_files = find_files(
+        '{}/intrinsics'.format(split_dir), exts=['*.txt'])
     pose_files = find_files('{}/pose'.format(split_dir), exts=['*.txt'])
 
     intrinsics_files = intrinsics_files[::skip]
@@ -48,23 +52,25 @@ def load_data_split(split_dir, skip=1, try_load_min_depth=True, only_img_files=F
     img_files = find_files('{}/rgb'.format(split_dir), exts=['*.png', '*.jpg'])
     if len(img_files) > 0:
         img_files = img_files[::skip]
-        assert(len(img_files) == cam_cnt)
+        assert (len(img_files) == cam_cnt)
     else:
         img_files = [None, ] * cam_cnt
 
     # mask files
-    mask_files = find_files('{}/mask'.format(split_dir), exts=['*.png', '*.jpg'])
+    mask_files = find_files('{}/mask'.format(split_dir),
+                            exts=['*.png', '*.jpg'])
     if len(mask_files) > 0:
         mask_files = mask_files[::skip]
-        assert(len(mask_files) == cam_cnt)
+        assert (len(mask_files) == cam_cnt)
     else:
         mask_files = [None, ] * cam_cnt
 
     # min depth files
-    mindepth_files = find_files('{}/min_depth'.format(split_dir), exts=['*.png', '*.jpg'])
+    mindepth_files = find_files(
+        '{}/min_depth'.format(split_dir), exts=['*.png', '*.jpg'])
     if try_load_min_depth and len(mindepth_files) > 0:
         mindepth_files = mindepth_files[::skip]
-        assert(len(mindepth_files) == cam_cnt)
+        assert (len(mindepth_files) == cam_cnt)
     else:
         mindepth_files = [None, ] * cam_cnt
 
@@ -73,38 +79,40 @@ def load_data_split(split_dir, skip=1, try_load_min_depth=True, only_img_files=F
 
 def rerotate_poses(poses, render_poses):
     poses = np.copy(poses)
-    centroid = poses[:,:3,3].mean(0)
+    centroid = poses[:, :3, 3].mean(0)
 
-    poses[:,:3,3] = poses[:,:3,3] - centroid
+    poses[:, :3, 3] = poses[:, :3, 3] - centroid
 
     # Find the minimum pca vector with minimum eigen value
-    x = poses[:,:3,3]
+    x = poses[:, :3, 3]
     mu = x.mean(0)
-    cov = np.cov((x-mu).T)
-    ev , eig = np.linalg.eig(cov)
-    cams_up = eig[:,np.argmin(ev)]
+    cov = np.cov((x - mu).T)
+    ev, eig = np.linalg.eig(cov)
+    cams_up = eig[:, np.argmin(ev)]
     if cams_up[1] < 0:
         cams_up = -cams_up
 
     # Find rotation matrix that align cams_up with [0,1,0]
     R = scipy.spatial.transform.Rotation.align_vectors(
-            [[0,-1,0]], cams_up[None])[0].as_matrix()
+        [[0, -1, 0]], cams_up[None])[0].as_matrix()
 
     # Apply rotation and add back the centroid position
-    poses[:,:3,:3] = R @ poses[:,:3,:3]
-    poses[:,:3,[3]] = R @ poses[:,:3,[3]]
-    poses[:,:3,3] = poses[:,:3,3] + centroid
+    poses[:, :3, :3] = R @ poses[:, :3, :3]
+    poses[:, :3, [3]] = R @ poses[:, :3, [3]]
+    poses[:, :3, 3] = poses[:, :3, 3] + centroid
     render_poses = np.copy(render_poses)
-    render_poses[:,:3,3] = render_poses[:,:3,3] - centroid
-    render_poses[:,:3,:3] = R @ render_poses[:,:3,:3]
-    render_poses[:,:3,[3]] = R @ render_poses[:,:3,[3]]
-    render_poses[:,:3,3] = render_poses[:,:3,3] + centroid
+    render_poses[:, :3, 3] = render_poses[:, :3, 3] - centroid
+    render_poses[:, :3, :3] = R @ render_poses[:, :3, :3]
+    render_poses[:, :3, [3]] = R @ render_poses[:, :3, [3]]
+    render_poses[:, :3, 3] = render_poses[:, :3, 3] + centroid
     return poses, render_poses
 
 
 def load_nerfpp_data(basedir, rerotate=True):
-    tr_K, tr_c2w, tr_im_path = load_data_split(os.path.join(basedir, 'train'))[:3]
-    te_K, te_c2w, te_im_path = load_data_split(os.path.join(basedir, 'test'))[:3]
+    tr_K, tr_c2w, tr_im_path = load_data_split(
+        os.path.join(basedir, 'train'))[:3]
+    te_K, te_c2w, te_im_path = load_data_split(
+        os.path.join(basedir, 'test'))[:3]
     assert len(tr_K) == len(tr_c2w) and len(tr_K) == len(tr_im_path)
     assert len(te_K) == len(te_c2w) and len(te_K) == len(te_im_path)
 
@@ -124,14 +132,14 @@ def load_nerfpp_data(basedir, rerotate=True):
         assert np.allclose(np.loadtxt(path), K_flatten)
     for path in te_K:
         assert np.allclose(np.loadtxt(path), K_flatten)
-    K = K_flatten.reshape(4,4)[:3,:3]
+    K = K_flatten.reshape(4, 4)[:3, :3]
 
     # Load camera poses
     poses = []
     for path in tr_c2w:
-        poses.append(np.loadtxt(path).reshape(4,4))
+        poses.append(np.loadtxt(path).reshape(4, 4))
     for path in te_c2w:
-        poses.append(np.loadtxt(path).reshape(4,4))
+        poses.append(np.loadtxt(path).reshape(4, 4))
 
     # Load images
     imgs = []
@@ -145,21 +153,22 @@ def load_nerfpp_data(basedir, rerotate=True):
     poses = np.stack(poses, 0)
     i_split.append(i_split[1])
     H, W = imgs.shape[1:3]
-    focal = K[[0,1], [0,1]].mean()
+    focal = K[[0, 1], [0, 1]].mean()
 
     # Generate movie trajectory
-    render_poses_path = sorted(glob.glob(os.path.join(basedir, 'camera_path', 'pose', '*txt')))
+    render_poses_path = sorted(
+        glob.glob(os.path.join(basedir, 'camera_path', 'pose', '*txt')))
     render_poses = []
     for path in render_poses_path:
-        render_poses.append(np.loadtxt(path).reshape(4,4))
+        render_poses.append(np.loadtxt(path).reshape(4, 4))
     render_poses = np.array(render_poses)
-    render_K = np.loadtxt(glob.glob(os.path.join(basedir, 'camera_path', 'intrinsics', '*txt'))[0]).reshape(4,4)[:3,:3]
-    render_poses[:,:,0] *= K[0,0] / render_K[0,0]
-    render_poses[:,:,1] *= K[1,1] / render_K[1,1]
+    render_K = np.loadtxt(glob.glob(os.path.join(
+        basedir, 'camera_path', 'intrinsics', '*txt'))[0]).reshape(4, 4)[:3, :3]
+    render_poses[:, :, 0] *= K[0, 0] / render_K[0, 0]
+    render_poses[:, :, 1] *= K[1, 1] / render_K[1, 1]
     if rerotate:
         poses, render_poses = rerotate_poses(poses, render_poses)
 
     render_poses = torch.Tensor(render_poses)
 
     return imgs, poses, render_poses, [H, W, focal], K, i_split
-

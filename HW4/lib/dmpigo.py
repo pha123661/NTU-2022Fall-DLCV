@@ -1,18 +1,17 @@
+import functools
 import os
 import time
-import functools
-import numpy as np
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor
 from einops import rearrange
+from torch import Tensor
 from torch_scatter import scatter_add, segment_coo
 
 from . import grid
-from .dvgo import Raw2Alpha, Alphas2Weights, render_utils_cuda
-
+from .dvgo import Alphas2Weights, Raw2Alpha, render_utils_cuda
 
 '''Model'''
 class DirectMPIGO(torch.nn.Module):
