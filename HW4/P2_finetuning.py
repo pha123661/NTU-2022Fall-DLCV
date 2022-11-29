@@ -10,21 +10,32 @@ from torchvision import models, transforms
 from tqdm import tqdm
 
 from P2_dataloader import ImageFolderDataset
-from P2_model import Classifier
+from P2_model import Classifier, RandomApply
 from warmup_scheduler import GradualWarmupScheduler
 
 
 def main(args):
+    image_size = 128
     train_transform = transforms.Compose([
-        transforms.Resize((128, 128)),
+        RandomApply(
+            transforms.ColorJitter(0.8, 0.8, 0.8, 0.2),
+            p=0.3
+        ),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomHorizontalFlip(),
+        RandomApply(
+            transforms.GaussianBlur((3, 3), (1.0, 2.0)),
+            p=0.2
+        ),
+        transforms.RandomResizedCrop((image_size, image_size)),
         transforms.ToTensor(),
         transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-        )
+            mean=torch.tensor([0.485, 0.456, 0.406]),
+            std=torch.tensor([0.229, 0.224, 0.225])
+        ),
     ])
     val_transform = transforms.Compose([
-        transforms.Resize((128, 128)),
+        transforms.Resize((image_size, image_size)),
         transforms.ToTensor(),
         transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
@@ -188,7 +199,7 @@ def parse():
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--bf16", action="store_true")
     parser.add_argument('--freeze_backbone', action='store_true')
-    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--epochs", type=int, default=300)
     parser.add_argument("--lr", type=float, default=5e-4)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--warmup_steps", type=int, default=100)
