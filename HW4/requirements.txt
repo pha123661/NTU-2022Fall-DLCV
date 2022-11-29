@@ -7,8 +7,8 @@ imageio
 imageio-ffmpeg
 opencv-python
 torch_efficient_distloss
-torch==1.12.1+cu102
---find-links https://download.pytorch.org/whl/torch_stable.html   
+# torch==1.12.1+cu102
+# --find-links https://download.pytorch.org/whl/torch_stable.html
 ninja
 # torch-scatter
 einops
