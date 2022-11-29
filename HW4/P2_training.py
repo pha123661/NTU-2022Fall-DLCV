@@ -1,14 +1,14 @@
 import argparse
 import pathlib
+import shutil
 
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard.writer import SummaryWriter
-from byol_pytorch import BYOL
 from torchvision import models, transforms
-import shutil
 from tqdm import tqdm
 
+from byol_pytorch import BYOL
 from P2_dataloader import ImageFolderDataset
 from warmup_scheduler import GradualWarmupScheduler
 
@@ -17,10 +17,11 @@ def main(args):
     train_transform = transforms.Compose([
         transforms.Resize(128),
         transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-        )
+        # already normalized in BYOL pipeline
+        # transforms.Normalize(
+        #     mean=[0.485, 0.456, 0.406],
+        #     std=[0.229, 0.224, 0.225]
+        # )
     ])
 
     train_set = ImageFolderDataset(
@@ -91,7 +92,8 @@ def main(args):
             log_global_step += 1
 
         # Save
-        torch.save(resnet.state_dict(), args.ckpt_dir / f"{epoch}_net.pth")
+        torch.save(resnet.state_dict(), args.ckpt_dir /
+                   f"{epoch}_backbone_net.pth")
 
 
 def parse():
@@ -105,7 +107,7 @@ def parse():
 
     # Output Path
     parser.add_argument("--tensorboard_path",
-                        type=pathlib.Path, default="./P2_tb")
+                        type=pathlib.Path, default="./P2_tb/backbone/")
     parser.add_argument("--ckpt_dir",
                         type=pathlib.Path, default="./P2_ckpt")
 
