@@ -96,6 +96,9 @@ def main(args):
     optim.zero_grad(set_to_none=True)
     optim.step()
 
+    training_args_dict = {k: str(v) for k, v in vars(args).items()}
+    print(f"## Training args: {json.dumps(training_args_dict, indent=2)}")
+
     for epoch in range(args.epochs):
         # Training
         for data in tqdm(train_loader):
@@ -153,9 +156,8 @@ def main(args):
                        f"best_classifier.pth")
             print('## Saved model')
 
-    training_args_dict = {k: str(v) for k, v in vars(args).items()}
     print(f"## Training args: {json.dumps(training_args_dict, indent=2)}")
-    print(f"## Final Result, va acc = {va_acc}")
+    print(f"## Final Result, va acc = {history_best}")
 
 
 def parse():
@@ -189,7 +191,7 @@ def parse():
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=5e-4)
     parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--warmup_steps", type=int, default=300)
+    parser.add_argument("--warmup_steps", type=int, default=100)
 
     # Model args
     parser.add_argument('--n_layers', type=int, default=3)
