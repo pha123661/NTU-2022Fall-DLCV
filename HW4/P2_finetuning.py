@@ -99,9 +99,9 @@ def main(args):
     )
 
     # Logging
-    if args.tensorboard_path.exists():
-        shutil.rmtree(args.tensorboard_path)
-    writer = SummaryWriter(args.tensorboard_path)
+    if args.tb_dir.exists():
+        shutil.rmtree(args.tb_dir)
+    writer = SummaryWriter(args.tb_dir)
     log_global_step = 0
     history_best = 0
     optim.zero_grad(set_to_none=True)
@@ -190,7 +190,7 @@ def parse():
                         default='hw4_data/pretrain_model_SL.pt')
 
     # Output Path
-    parser.add_argument("--tensorboard_path",
+    parser.add_argument("--tb_dir",
                         type=pathlib.Path, default="./P2_tb/finetune")
     parser.add_argument("--ckpt_dir",
                         type=pathlib.Path, default="./P2_ckpt")
@@ -205,9 +205,9 @@ def parse():
     parser.add_argument("--warmup_steps", type=int, default=100)
 
     # Model args
-    parser.add_argument('--n_layers', type=int, default=3)
+    parser.add_argument('--n_layers', type=int, default=4)
     parser.add_argument('--dropout', type=float, default=0.1)
-    parser.add_argument('--hidden_size', type=int, default=512)
+    parser.add_argument('--hidden_size', type=int, default=256)
     args = parser.parse_args()
     return args
 
