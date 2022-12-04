@@ -7,23 +7,28 @@ basedir = './logs/'               # where to store ckpts and logs
 '''
 data = dict(
     datadir=None,                 # path to dataset root folder
-    dataset_type=None,            # blender | nsvf | blendedmvs | tankstemple | deepvoxels | co3d
-    inverse_y=False,              # intrinsict mode (to support blendedmvs, nsvf, tankstemple)
+    # blender | nsvf | blendedmvs | tankstemple | deepvoxels | co3d
+    dataset_type=None,
+    # intrinsict mode (to support blendedmvs, nsvf, tankstemple)
+    inverse_y=False,
     flip_x=False,                 # to support co3d
     flip_y=False,                 # to support co3d
     annot_path='',                # to support co3d
     split_path='',                # to support co3d
     sequence_name='',             # to support co3d
-    load2gpu_on_the_fly=False,    # do not load all images into gpu (to save gpu memory)
+    # do not load all images into gpu (to save gpu memory)
+    load2gpu_on_the_fly=False,
     testskip=1,                   # subsample testset to preview results
-    white_bkgd=False,             # use white background (note that some dataset don't provide alpha and with blended bg color)
+    # use white background (note that some dataset don't provide alpha and with blended bg color)
+    white_bkgd=False,
     rand_bkgd=False,              # use random background during training
     half_res=False,               # [TODO]
     bd_factor=.75,
     movie_render_kwargs=dict(),
 
     # Below are forward-facing llff specific settings.
-    ndc=False,                    # use ndc coordinate (only for forward-facing; not support yet)
+    # use ndc coordinate (only for forward-facing; not support yet)
+    ndc=False,
     spherify=False,               # inward-facing
     factor=4,                     # [TODO]
     width=None,                   # enforce image width
@@ -40,7 +45,8 @@ data = dict(
 '''
 coarse_train = dict(
     N_iters=5000,                 # number of optimization steps
-    N_rand=8192,                  # batch size (number of random rays per optimization step)
+    # batch size (number of random rays per optimization step)
+    N_rand=8192,
     lrate_density=1e-1,           # lr of density voxel grid
     lrate_k0=1e-1,                # lr of color/feature voxel grid
     lrate_rgbnet=1e-3,            # lr of the mlp to preduct view-dependent color
@@ -56,12 +62,15 @@ coarse_train = dict(
     tv_every=1,                   # count total variation loss every tv_every step
     tv_after=0,                   # count total variation loss from tv_from step
     tv_before=0,                  # count total variation before the given number of iterations
-    tv_dense_before=0,            # count total variation densely before the given number of iterations
+    # count total variation densely before the given number of iterations
+    tv_dense_before=0,
     weight_tv_density=0.0,        # weight of total variation loss of density voxel grid
-    weight_tv_k0=0.0,             # weight of total variation loss of color/feature voxel grid
+    # weight of total variation loss of color/feature voxel grid
+    weight_tv_k0=0.0,
     pg_scale=[],                  # checkpoints for progressive scaling
     decay_after_scale=1.0,        # decay act_shift after scaling
-    skip_zero_grad_fields=[],     # the variable name to skip optimizing parameters w/ zero grad in each iteration
+    # the variable name to skip optimizing parameters w/ zero grad in each iteration
+    skip_zero_grad_fields=[],
     maskout_lt_nviews=0,
 )
 
@@ -85,7 +94,8 @@ coarse_model_and_render = dict(
     k0_type='DenseGrid',          # DenseGrid, TensoRFGrid
     density_config=dict(),
     k0_config=dict(),
-    mpi_depth=128,                # the number of planes in Multiplane Image (work when ndc=True)
+    # the number of planes in Multiplane Image (work when ndc=True)
+    mpi_depth=128,
     nearest=False,                # nearest interpolation
     pre_act_density=False,        # pre-activated trilinear interpolation
     in_act_density=False,         # in-activated trilinear interpolation
@@ -93,12 +103,16 @@ coarse_model_and_render = dict(
     mask_cache_thres=1e-3,        # threshold to determine a tighten BBox in the fine stage
     rgbnet_dim=0,                 # feature voxel grid dim
     rgbnet_full_implicit=False,   # let the colors MLP ignore feature voxel grid
-    rgbnet_direct=True,           # set to False to treat the first 3 dim of feature voxel grid as diffuse rgb
-    rgbnet_depth=3,               # depth of the colors MLP (there are rgbnet_depth-1 intermediate features)
+    # set to False to treat the first 3 dim of feature voxel grid as diffuse rgb
+    rgbnet_direct=True,
+    # depth of the colors MLP (there are rgbnet_depth-1 intermediate features)
+    rgbnet_depth=3,
     rgbnet_width=128,             # width of the colors MLP
     alpha_init=1e-6,              # set the alpha values everywhere at the begin of training
-    fast_color_thres=1e-7,        # threshold of alpha value to skip the fine stage sampled point
-    maskout_near_cam_vox=True,    # maskout grid points that between cameras and their near planes
+    # threshold of alpha value to skip the fine stage sampled point
+    fast_color_thres=1e-7,
+    # maskout grid points that between cameras and their near planes
+    maskout_near_cam_vox=True,
     world_bound_scale=1,          # rescale the BBox enclosing the scene
     stepsize=0.5,                 # sampling stepsize in volume rendering
 )
