@@ -3,7 +3,7 @@ import pathlib
 import shutil
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard.writer import SummaryWriter
 from torchvision import models, transforms
 from tqdm import tqdm
@@ -24,13 +24,16 @@ def main(args):
         # )
     ])
 
-    train_set = ImageFolderDataset(
+    dataset = ImageFolderDataset(
         args.train_image_dir,
         transform=train_transform,
-        # label_csv="hw4_data/mini/train.csv",
     )
+    train_set, valid_set = random_split(dataset, [0.9, 0.1])
     train_loader = DataLoader(
-        train_set, batch_size=args.batch_size, shuffle=True, num_workers=4
+        train_set, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True
+    )
+    valid_loader = DataLoader(
+        valid_set, batch_size=2 * args.batch_size, shuffle=False, num_workers=4, pin_memory=True
     )
 
     resnet = models.resnet50(weights=None)
@@ -41,12 +44,11 @@ def main(args):
         use_momentum=False,
     ).to(args.device)
     # Training
-    amp_enable = any([args.fp16, args.bf16])
-    amp_dtype = torch.bfloat16 if args.bf16 else torch.float16
+    amp_enable = args.fp16
     amp_device_type = 'cpu' if args.device == torch.device('cpu') else 'cuda'
     if amp_enable:
         print(
-            f"Enable AMP training using dtype={amp_dtype} on {amp_device_type}")
+            f"Enable AMP training using on {args.device}:{amp_device_type}")
 
     optim = torch.optim.Adam(learner.parameters(), lr=args.lr)
     scaler = torch.cuda.amp.GradScaler(enabled=amp_enable)
@@ -64,15 +66,17 @@ def main(args):
     if args.tensorboard_path.exists():
         shutil.rmtree(args.tensorboard_path)
     writer = SummaryWriter(args.tensorboard_path)
-    log_global_step = 0
     optim.zero_grad(set_to_none=True)
     optim.step()
-
+    log_global_step = 0
+    best_va_loss = 2**64
     for epoch in range(args.epochs):
+        writer.add_scalar('training/epoch', epoch, global_step=log_global_step)
+        # Training
         for data in tqdm(train_loader):
             # Forward & Backpropagation
             img = data['img'].to(args.device)
-            with torch.autocast(device_type=amp_device_type, dtype=amp_dtype, enabled=amp_enable):
+            with torch.autocast(device_type=amp_device_type, enabled=amp_enable):
                 loss = learner(img)
 
             # Update
@@ -91,9 +95,32 @@ def main(args):
 
             log_global_step += 1
 
+        # Validation
+        va_loss = []
+        for data in valid_loader:
+            # Forward & Backpropagation
+            img = data['img'].to(args.device)
+            with torch.no_grad():
+                with torch.autocast(device_type=amp_device_type, enabled=amp_enable):
+                    loss = learner(img)
+
+            # Update
+            loss = loss.item()
+            va_loss.append(loss)
+            # Log
+            writer.add_scalar("validation/loss", loss,
+                              global_step=log_global_step)
+
         # Save
-        torch.save(resnet.state_dict(), args.ckpt_dir /
-                   f"{epoch}_backbone_net.pth")
+        va_loss = sum(va_loss) / len(va_loss)
+        print(f"Epoch {epoch}, validation loss: {va_loss}")
+        if va_loss <= best_va_loss:
+            best_va_loss = va_loss
+            torch.save(resnet.state_dict(), args.ckpt_dir /
+                       f"{epoch}_backbone_net.pth")
+            print("Saved model")
+
+    print(f'Done, best validation loss: {va_loss}')
 
 
 def parse():
@@ -113,10 +140,9 @@ def parse():
 
     # Training args
     parser.add_argument("--fp16", action="store_true")
-    parser.add_argument("--bf16", action="store_true")
     parser.add_argument("--epochs", type=int, default=60)
     parser.add_argument("--lr", type=float, default=4e-3)
-    parser.add_argument("--batch_size", type=int, default=256)
+    parser.add_argument("--batch_size", type=int, default=512)
     parser.add_argument("--warmup_steps", type=int, default=300)
 
     args = parser.parse_args()
