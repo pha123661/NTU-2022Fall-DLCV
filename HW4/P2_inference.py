@@ -13,7 +13,7 @@ from P2_model import Classifier
 
 @torch.no_grad()
 def main(args):
-    print('loading dataset')
+    print('Loading dataset')
     image_size = 128
     transform = transforms.Compose([
         transforms.Resize((image_size, image_size)),
@@ -32,7 +32,8 @@ def main(args):
     )
     with (args.ckpt_dir / "office_label2idx.json").open('r') as f:
         idx2label = {v: k for k, v in json.load(f).items()}
-    print('constructing model')
+
+    print('Constructing model')
     model = Classifier(
         backbone=models.resnet50(weights=None),
         in_features=1000,
@@ -44,7 +45,8 @@ def main(args):
     model.load_state_dict(torch.load(
         args.ckpt_dir / "classifier.pth", map_location=args.device))
     model.eval()
-    print('predicting')
+
+    print('Predicting')
     filename2pred_class = dict()
     for data in dataloader:
         img = data['img'].to(args.device)
@@ -53,7 +55,8 @@ def main(args):
         for filename, pred in zip(data['filename'], y_pred):
             class_name = idx2label[pred.item()]
             filename2pred_class[filename] = class_name
-    print('flushing output')
+
+    print('Flushing output')
     # write output
     with args.input_csv.open('r') as in_f:
         with args.output_csv.open('w') as out_f:
@@ -68,6 +71,8 @@ def main(args):
                     filename,
                     filename2pred_class[filename]
                 ))
+
+    print('Done')
 
 
 def parse():
