@@ -44,7 +44,7 @@ data = dict(
 ''' Template of training options
 '''
 coarse_train = dict(
-    N_iters=5000,                 # number of optimization steps
+    N_iters=15000,                 # number of optimization steps
     # batch size (number of random rays per optimization step)
     N_rand=8192,
     lrate_density=1e-1,           # lr of density voxel grid
@@ -76,7 +76,7 @@ coarse_train = dict(
 
 fine_train = deepcopy(coarse_train)
 fine_train.update(dict(
-    N_iters=20000,
+    N_iters=60000,
     pervoxel_lr=False,
     ray_sampler='in_maskcache',
     weight_entropy_last=0.001,
@@ -106,8 +106,8 @@ coarse_model_and_render = dict(
     # set to False to treat the first 3 dim of feature voxel grid as diffuse rgb
     rgbnet_direct=True,
     # depth of the colors MLP (there are rgbnet_depth-1 intermediate features)
-    rgbnet_depth=3,
-    rgbnet_width=128,             # width of the colors MLP
+    rgbnet_depth=4,
+    rgbnet_width=256,             # width of the colors MLP
     alpha_init=1e-6,              # set the alpha values everywhere at the begin of training
     # threshold of alpha value to skip the fine stage sampled point
     fast_color_thres=1e-7,
