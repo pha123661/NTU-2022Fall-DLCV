@@ -61,12 +61,18 @@ def main(args):
     )
 
     backbone = models.resnet50(weights=None)
-    backbone.load_state_dict(torch.load(
-        args.backbone, map_location=args.device))
+    if args.backbone is None:
+        print('No backbone provided, initialize backbone from scratch')
+    else:
+        backbone.load_state_dict(torch.load(
+            args.backbone, map_location=args.device))
+        print(f'Loaded backbone from {args.backbone}')
+
     backbone = backbone.to(args.device)
     if args.freeze_backbone:
         for p in backbone.parameters():
             p.requires_grad = False
+        print('Freezed backbone')
 
     model = Classifier(
         backbone=backbone,
@@ -186,14 +192,14 @@ def parse():
     parser.add_argument('--device', type=torch.device,
                         default='cuda' if torch.cuda.is_available() else 'cpu')
 
-    parser.add_argument('--backbone', type=pathlib.Path,
-                        default='hw4_data/pretrain_model_SL.pt')
+    parser.add_argument('--backbone', type=pathlib.Path)
 
     # Output Path
     parser.add_argument("--tb_dir",
                         type=pathlib.Path, default="./P2_tb/finetune")
     parser.add_argument("--ckpt_dir",
                         type=pathlib.Path, default="./P2_ckpt")
+    parser.add_argument('--exp_name', type=str)
 
     # Training args
     parser.add_argument("--fp16", action="store_true")
@@ -214,5 +220,8 @@ def parse():
 
 if __name__ == '__main__':
     args = parse()
+    if args.exp_name is not None:
+        args.ckpt_dir = args.ckpt_dir / args.exp_name
+        args.tb_dir = args.tb_dir / args.exp_name
     args.ckpt_dir.mkdir(exist_ok=True, parents=True)
     main(args)
