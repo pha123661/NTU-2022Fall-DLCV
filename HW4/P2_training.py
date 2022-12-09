@@ -1,6 +1,7 @@
 import argparse
 import pathlib
 import shutil
+from heapq import heappop, heappush
 
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -48,7 +49,7 @@ def main(args):
     amp_device_type = 'cpu' if args.device == torch.device('cpu') else 'cuda'
     if amp_enable:
         print(
-            f"Enable AMP training using on {args.device}:{amp_device_type}")
+            f"Enable AMP training on {args.device}:{amp_device_type}")
 
     optim = torch.optim.Adam(learner.parameters(), lr=args.lr)
     scaler = torch.cuda.amp.GradScaler(enabled=amp_enable)
@@ -69,7 +70,7 @@ def main(args):
     optim.zero_grad(set_to_none=True)
     optim.step()
     log_global_step = 0
-    best_va_loss = 2**64
+    saved_files = []  # max_heap
     for epoch in range(args.epochs):
         writer.add_scalar('training/epoch', epoch, global_step=log_global_step)
         # Training
@@ -114,16 +115,19 @@ def main(args):
         # Save
         va_loss = sum(va_loss) / len(va_loss)
         print(f"Epoch {epoch}, validation loss: {va_loss}")
-        if va_loss <= best_va_loss:
-            best_va_loss = va_loss
-            torch.save(resnet.state_dict(), args.ckpt_dir /
-                       f"{epoch}_backbone_net.pth")
+        if not saved_files or va_loss < -saved_files[0][0]:
+            save_path = args.ckpt_dir / f"{epoch}_backbone_net.pth"
+            torch.save(resnet.state_dict(), save_path)
             print("Saved model")
+            while len(saved_files) > args.save_best_k - 1:
+                _, popped_state_dict = heappop(saved_files)
+                popped_state_dict.unlink()
+            heappush(saved_files, (-va_loss, save_path))
 
     print(f'Done, best validation loss: {va_loss}')
 
 
-def parse():
+def parse_args():
     parser = argparse.ArgumentParser()
 
     # Environment
@@ -137,19 +141,21 @@ def parse():
                         type=pathlib.Path, default="./P2_tb/backbone/")
     parser.add_argument("--ckpt_dir",
                         type=pathlib.Path, default="./P2_ckpt")
+    parser.add_argument('--save_best_k', type=int, default=4)
 
     # Training args
     parser.add_argument("--fp16", action="store_true")
-    parser.add_argument("--epochs", type=int, default=60)
-    parser.add_argument("--lr", type=float, default=4e-3)
+    parser.add_argument("--epochs", type=int, default=1000)
+    parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--batch_size", type=int, default=512)
-    parser.add_argument("--warmup_steps", type=int, default=300)
+    parser.add_argument("--warmup_steps", type=int, default=1000)
 
     args = parser.parse_args()
+    assert args.save_best_k > 0, "--save_best_k must > 0"
+    args.ckpt_dir.mkdir(exist_ok=True, parents=True)
     return args
 
 
 if __name__ == '__main__':
-    args = parse()
-    args.ckpt_dir.mkdir(exist_ok=True, parents=True)
+    args = parse_args()
     main(args)
