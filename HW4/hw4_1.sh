@@ -1,3 +1,2 @@
 #!/bin/bash
-python3 .py $1 $2
-# TODO - run your inference Python3 code
+python3 P1_inference.py --config=./hotdog.py --render_only --render_test --dump_images --input_json=$1 --output_dir=$2
