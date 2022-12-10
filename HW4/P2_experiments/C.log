@@ -1,0 +1,383 @@
+Loaded backbone from P2_ckpt/833_backbone.pth
+Enable AMP training using dtype=torch.float16 on cuda
+## Training args: {
+  "train_image_dir": "hw4_data/office/train",
+  "train_label": "hw4_data/office/train.csv",
+  "val_image_dir": "hw4_data/office/val",
+  "val_label": "hw4_data/office/val.csv",
+  "device": "cuda",
+  "backbone": "P2_ckpt/833_backbone.pth",
+  "tb_dir": "P2_tb/finetune/833_all",
+  "ckpt_dir": "P2_ckpt/833_all",
+  "exp_name": "833_all",
+  "fp16": "True",
+  "bf16": "False",
+  "freeze_backbone": "False",
+  "epochs": "300",
+  "lr": "0.0005",
+  "batch_size": "64",
+  "warmup_steps": "100",
+  "n_layers": "4",
+  "dropout": "0.1",
+  "hidden_size": "256"
+}
+epoch 0: va acc = 0.061789773404598236
+## Saved model
+epoch 1: va acc = 0.08558238670229912
+## Saved model
+epoch 2: va acc = 0.11097301170229912
+## Saved model
+epoch 3: va acc = 0.10511363670229912
+epoch 4: va acc = 0.13334517180919647
+## Saved model
+epoch 5: va acc = 0.1876775585114956
+## Saved model
+epoch 6: va acc = 0.16654829680919647
+epoch 7: va acc = 0.18643466010689735
+epoch 8: va acc = 0.20205966010689735
+## Saved model
+epoch 9: va acc = 0.1876775585114956
+epoch 10: va acc = 0.15873579680919647
+epoch 11: va acc = 0.20401278510689735
+## Saved model
+epoch 12: va acc = 0.2443181835114956
+## Saved model
+epoch 13: va acc = 0.24272017180919647
+epoch 14: va acc = 0.1954900585114956
+epoch 15: va acc = 0.22407670319080353
+epoch 16: va acc = 0.2459161952137947
+## Saved model
+epoch 17: va acc = 0.29243607819080353
+## Saved model
+epoch 18: va acc = 0.2732599452137947
+epoch 19: va acc = 0.23881392180919647
+epoch 20: va acc = 0.2966974452137947
+## Saved model
+epoch 21: va acc = 0.29829545319080353
+## Saved model
+epoch 22: va acc = 0.30575284361839294
+## Saved model
+epoch 23: va acc = 0.34055398404598236
+## Saved model
+epoch 24: va acc = 0.2716619335114956
+epoch 25: va acc = 0.32368607819080353
+epoch 26: va acc = 0.2794744335114956
+epoch 27: va acc = 0.3025568202137947
+epoch 28: va acc = 0.3068181835114956
+epoch 29: va acc = 0.2794744335114956
+epoch 30: va acc = 0.3377130702137947
+epoch 31: va acc = 0.3361150585114956
+epoch 32: va acc = 0.3458806835114956
+## Saved model
+epoch 33: va acc = 0.3146306835114956
+epoch 34: va acc = 0.32954545319080353
+epoch 35: va acc = 0.3181818202137947
+epoch 36: va acc = 0.34676846861839294
+## Saved model
+epoch 37: va acc = 0.3107244335114956
+epoch 38: va acc = 0.3435724452137947
+epoch 39: va acc = 0.3396661952137947
+epoch 40: va acc = 0.36629971861839294
+## Saved model
+epoch 41: va acc = 0.38227982819080353
+## Saved model
+epoch 42: va acc = 0.35688920319080353
+epoch 43: va acc = 0.38032670319080353
+epoch 44: va acc = 0.35493607819080353
+epoch 45: va acc = 0.39364346861839294
+## Saved model
+epoch 46: va acc = 0.3259943202137947
+epoch 47: va acc = 0.40305398404598236
+## Saved model
+epoch 48: va acc = 0.39754971861839294
+epoch 49: va acc = 0.4312855154275894
+## Saved model
+epoch 50: va acc = 0.3709161952137947
+epoch 51: va acc = 0.42063210904598236
+epoch 52: va acc = 0.39204545319080353
+epoch 53: va acc = 0.3904474452137947
+epoch 54: va acc = 0.4534801170229912
+## Saved model
+epoch 55: va acc = 0.38618607819080353
+epoch 56: va acc = 0.41548295319080353
+epoch 57: va acc = 0.38227982819080353
+epoch 58: va acc = 0.41317471861839294
+epoch 59: va acc = 0.42063210904598236
+epoch 60: va acc = 0.4005681835114956
+epoch 61: va acc = 0.43270596861839294
+epoch 62: va acc = 0.46875
+## Saved model
+epoch 63: va acc = 0.43856534361839294
+epoch 64: va acc = 0.4749644920229912
+## Saved model
+epoch 65: va acc = 0.478515625
+## Saved model
+epoch 66: va acc = 0.43075284361839294
+epoch 67: va acc = 0.44211648404598236
+epoch 68: va acc = 0.44992898404598236
+epoch 69: va acc = 0.4710582420229912
+epoch 70: va acc = 0.44602273404598236
+epoch 71: va acc = 0.470703125
+epoch 72: va acc = 0.46590909361839294
+epoch 73: va acc = 0.46946023404598236
+epoch 74: va acc = 0.46395596861839294
+epoch 75: va acc = 0.43465909361839294
+epoch 76: va acc = 0.4314630702137947
+epoch 77: va acc = 0.41512784361839294
+epoch 78: va acc = 0.46555398404598236
+epoch 79: va acc = 0.47141335904598236
+epoch 80: va acc = 0.44637784361839294
+epoch 81: va acc = 0.47336648404598236
+epoch 82: va acc = 0.4691051170229912
+epoch 83: va acc = 0.47727273404598236
+epoch 84: va acc = 0.44406960904598236
+epoch 85: va acc = 0.48313210904598236
+## Saved model
+epoch 86: va acc = 0.4769176170229912
+epoch 87: va acc = 0.4827769920229912
+epoch 88: va acc = 0.48313210904598236
+epoch 89: va acc = 0.47531960904598236
+epoch 90: va acc = 0.48508523404598236
+## Saved model
+epoch 91: va acc = 0.48899148404598236
+## Saved model
+epoch 92: va acc = 0.517578125
+## Saved model
+epoch 93: va acc = 0.4710582420229912
+epoch 94: va acc = 0.5026633590459824
+epoch 95: va acc = 0.4976917654275894
+epoch 96: va acc = 0.44406960904598236
+epoch 97: va acc = 0.5003551170229912
+epoch 98: va acc = 0.46164773404598236
+epoch 99: va acc = 0.53125
+## Saved model
+epoch 100: va acc = 0.4827769920229912
+epoch 101: va acc = 0.5042613670229912
+epoch 102: va acc = 0.48703835904598236
+epoch 103: va acc = 0.48544034361839294
+epoch 104: va acc = 0.51171875
+epoch 105: va acc = 0.48313210904598236
+epoch 106: va acc = 0.5152698904275894
+epoch 107: va acc = 0.5046164840459824
+epoch 108: va acc = 0.5426136404275894
+## Saved model
+epoch 109: va acc = 0.5285866558551788
+epoch 110: va acc = 0.49520596861839294
+epoch 111: va acc = 0.5026633590459824
+epoch 112: va acc = 0.5367542654275894
+epoch 113: va acc = 0.515625
+epoch 114: va acc = 0.4710582420229912
+epoch 115: va acc = 0.5101207420229912
+epoch 116: va acc = 0.47958096861839294
+epoch 117: va acc = 0.5120738670229912
+epoch 118: va acc = 0.5133167654275894
+epoch 119: va acc = 0.52734375
+epoch 120: va acc = 0.5101207420229912
+epoch 121: va acc = 0.5159801170229912
+epoch 122: va acc = 0.53515625
+epoch 123: va acc = 0.5426136404275894
+epoch 124: va acc = 0.53125
+epoch 125: va acc = 0.5120738670229912
+epoch 126: va acc = 0.5676491558551788
+## Saved model
+epoch 127: va acc = 0.5543323904275894
+epoch 128: va acc = 0.5182883590459824
+epoch 129: va acc = 0.49875710904598236
+epoch 130: va acc = 0.5120738670229912
+epoch 131: va acc = 0.5081676170229912
+epoch 132: va acc = 0.49165482819080353
+epoch 133: va acc = 0.5452769920229912
+epoch 134: va acc = 0.5569957420229912
+epoch 135: va acc = 0.5296519920229912
+epoch 136: va acc = 0.5276988670229912
+epoch 137: va acc = 0.5026633590459824
+epoch 138: va acc = 0.5504261404275894
+epoch 139: va acc = 0.546875
+epoch 140: va acc = 0.5374644920229912
+epoch 141: va acc = 0.548828125
+epoch 142: va acc = 0.5069247186183929
+epoch 143: va acc = 0.5562855154275894
+epoch 144: va acc = 0.5049715936183929
+epoch 145: va acc = 0.5276988670229912
+epoch 146: va acc = 0.5010653436183929
+epoch 147: va acc = 0.52734375
+epoch 148: va acc = 0.5735085308551788
+## Saved model
+epoch 149: va acc = 0.5179332420229912
+epoch 150: va acc = 0.48544034361839294
+epoch 151: va acc = 0.5319602340459824
+epoch 152: va acc = 0.5316051170229912
+epoch 153: va acc = 0.5237926170229912
+epoch 154: va acc = 0.529296875
+epoch 155: va acc = 0.5355113670229912
+epoch 156: va acc = 0.5598366558551788
+epoch 157: va acc = 0.552734375
+epoch 158: va acc = 0.5296519920229912
+epoch 159: va acc = 0.5523792654275894
+epoch 160: va acc = 0.546875
+epoch 161: va acc = 0.5127840936183929
+epoch 162: va acc = 0.5582386404275894
+epoch 163: va acc = 0.556640625
+epoch 164: va acc = 0.5276988670229912
+epoch 165: va acc = 0.5562855154275894
+epoch 166: va acc = 0.5182883590459824
+epoch 167: va acc = 0.5124289840459824
+epoch 168: va acc = 0.5143821090459824
+epoch 169: va acc = 0.51953125
+epoch 170: va acc = 0.53125
+epoch 171: va acc = 0.5234375
+epoch 172: va acc = 0.546875
+epoch 173: va acc = 0.5257457420229912
+epoch 174: va acc = 0.513671875
+epoch 175: va acc = 0.5296519920229912
+epoch 176: va acc = 0.5143821090459824
+epoch 177: va acc = 0.5026633590459824
+epoch 178: va acc = 0.5030184686183929
+epoch 179: va acc = 0.5143821090459824
+epoch 180: va acc = 0.5358664840459824
+epoch 181: va acc = 0.5355113670229912
+epoch 182: va acc = 0.5582386404275894
+epoch 183: va acc = 0.5703125
+epoch 184: va acc = 0.5394176170229912
+epoch 185: va acc = 0.5816761404275894
+## Saved model
+epoch 186: va acc = 0.5397727340459824
+epoch 187: va acc = 0.5339133590459824
+epoch 188: va acc = 0.5280539840459824
+epoch 189: va acc = 0.560546875
+epoch 190: va acc = 0.5719105154275894
+epoch 191: va acc = 0.5358664840459824
+epoch 192: va acc = 0.5316051170229912
+epoch 193: va acc = 0.5667613670229912
+epoch 194: va acc = 0.49751420319080353
+epoch 195: va acc = 0.5452769920229912
+epoch 196: va acc = 0.5550426170229912
+epoch 197: va acc = 0.564453125
+epoch 198: va acc = 0.556640625
+epoch 199: va acc = 0.5875355154275894
+## Saved model
+epoch 200: va acc = 0.5656960308551788
+epoch 201: va acc = 0.55078125
+epoch 202: va acc = 0.5546875
+epoch 203: va acc = 0.5163352340459824
+epoch 204: va acc = 0.5491832420229912
+epoch 205: va acc = 0.5316051170229912
+epoch 206: va acc = 0.55859375
+epoch 207: va acc = 0.5205965936183929
+epoch 208: va acc = 0.5436789840459824
+epoch 209: va acc = 0.5569957420229912
+epoch 210: va acc = 0.5472301170229912
+epoch 211: va acc = 0.5511363670229912
+epoch 212: va acc = 0.5621448904275894
+epoch 213: va acc = 0.5355113670229912
+epoch 214: va acc = 0.5914417654275894
+## Saved model
+epoch 215: va acc = 0.568359375
+epoch 216: va acc = 0.5550426170229912
+epoch 217: va acc = 0.5546875
+epoch 218: va acc = 0.5495383590459824
+epoch 219: va acc = 0.5797230154275894
+epoch 220: va acc = 0.544921875
+epoch 221: va acc = 0.5758167654275894
+epoch 222: va acc = 0.5719105154275894
+epoch 223: va acc = 0.5774147808551788
+epoch 224: va acc = 0.5530894920229912
+epoch 225: va acc = 0.5530894920229912
+epoch 226: va acc = 0.5589488670229912
+epoch 227: va acc = 0.5726207420229912
+epoch 228: va acc = 0.5569957420229912
+epoch 229: va acc = 0.57421875
+epoch 230: va acc = 0.5436789840459824
+epoch 231: va acc = 0.5871804058551788
+epoch 232: va acc = 0.5969460308551788
+## Saved model
+epoch 233: va acc = 0.5875355154275894
+epoch 234: va acc = 0.568359375
+epoch 235: va acc = 0.5703125
+epoch 236: va acc = 0.5852272808551788
+epoch 237: va acc = 0.5777698904275894
+epoch 238: va acc = 0.5875355154275894
+epoch 239: va acc = 0.556640625
+epoch 240: va acc = 0.5530894920229912
+epoch 241: va acc = 0.568359375
+epoch 242: va acc = 0.57421875
+epoch 243: va acc = 0.5472301170229912
+epoch 244: va acc = 0.56640625
+epoch 245: va acc = 0.5875355154275894
+epoch 246: va acc = 0.56640625
+epoch 247: va acc = 0.56640625
+epoch 248: va acc = 0.5758167654275894
+epoch 249: va acc = 0.57421875
+epoch 250: va acc = 0.5855823904275894
+epoch 251: va acc = 0.5758167654275894
+epoch 252: va acc = 0.5777698904275894
+epoch 253: va acc = 0.5859375
+epoch 254: va acc = 0.576171875
+epoch 255: va acc = 0.5758167654275894
+epoch 256: va acc = 0.5988991558551788
+## Saved model
+epoch 257: va acc = 0.564453125
+epoch 258: va acc = 0.568359375
+epoch 259: va acc = 0.568359375
+epoch 260: va acc = 0.5758167654275894
+epoch 261: va acc = 0.5680042654275894
+epoch 262: va acc = 0.5777698904275894
+epoch 263: va acc = 0.5871804058551788
+epoch 264: va acc = 0.5891335308551788
+epoch 265: va acc = 0.5699573904275894
+epoch 266: va acc = 0.5758167654275894
+epoch 267: va acc = 0.5625
+epoch 268: va acc = 0.55859375
+epoch 269: va acc = 0.5816761404275894
+epoch 270: va acc = 0.5891335308551788
+epoch 271: va acc = 0.5738636404275894
+epoch 272: va acc = 0.55859375
+epoch 273: va acc = 0.5758167654275894
+epoch 274: va acc = 0.5836292654275894
+epoch 275: va acc = 0.5891335308551788
+epoch 276: va acc = 0.5852272808551788
+epoch 277: va acc = 0.5758167654275894
+epoch 278: va acc = 0.5836292654275894
+epoch 279: va acc = 0.5813210308551788
+epoch 280: va acc = 0.5758167654275894
+epoch 281: va acc = 0.5777698904275894
+epoch 282: va acc = 0.5680042654275894
+epoch 283: va acc = 0.5777698904275894
+epoch 284: va acc = 0.5625
+epoch 285: va acc = 0.5738636404275894
+epoch 286: va acc = 0.5738636404275894
+epoch 287: va acc = 0.560546875
+epoch 288: va acc = 0.556640625
+epoch 289: va acc = 0.5816761404275894
+epoch 290: va acc = 0.5738636404275894
+epoch 291: va acc = 0.55859375
+epoch 292: va acc = 0.5832741558551788
+epoch 293: va acc = 0.564453125
+epoch 294: va acc = 0.5777698904275894
+epoch 295: va acc = 0.5777698904275894
+epoch 296: va acc = 0.5738636404275894
+epoch 297: va acc = 0.560546875
+epoch 298: va acc = 0.5719105154275894
+epoch 299: va acc = 0.5719105154275894
+## Training args: {
+  "train_image_dir": "hw4_data/office/train",
+  "train_label": "hw4_data/office/train.csv",
+  "val_image_dir": "hw4_data/office/val",
+  "val_label": "hw4_data/office/val.csv",
+  "device": "cuda",
+  "backbone": "P2_ckpt/833_backbone.pth",
+  "tb_dir": "P2_tb/finetune/833_all",
+  "ckpt_dir": "P2_ckpt/833_all",
+  "exp_name": "833_all",
+  "fp16": "True",
+  "bf16": "False",
+  "freeze_backbone": "False",
+  "epochs": "300",
+  "lr": "0.0005",
+  "batch_size": "64",
+  "warmup_steps": "100",
+  "n_layers": "4",
+  "dropout": "0.1",
+  "hidden_size": "256"
+}
+## Final Result, va acc = 0.5988991558551788
