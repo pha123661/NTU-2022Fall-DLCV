@@ -17,6 +17,7 @@ from warmup_scheduler import GradualWarmupScheduler
 def main(args):
     image_size = 128
     train_transform = transforms.Compose([
+        transforms.Resize((image_size, image_size)),
         RandomApply(
             transforms.ColorJitter(0.8, 0.8, 0.8, 0.2),
             p=0.3
@@ -54,7 +55,7 @@ def main(args):
         label_csv=args.val_label,
     )
     train_loader = DataLoader(
-        train_set, batch_size=args.batch_size, shuffle=True, num_workers=6, pin_memory=True
+        train_set, batch_size=args.batch_size, shuffle=True, num_workers=12, pin_memory=True
     )
     val_loader = DataLoader(
         val_set, batch_size=args.batch_size * 2, shuffle=False, num_workers=4, pin_memory=True
