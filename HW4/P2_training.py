@@ -116,7 +116,7 @@ def main(args):
         va_loss = sum(va_loss) / len(va_loss)
         print(f"Epoch {epoch}, validation loss: {va_loss}")
         if not saved_files or va_loss < -saved_files[0][0]:
-            save_path = args.ckpt_dir / f"{epoch}_backbone_net.pth"
+            save_path = args.ckpt_dir / f"{epoch}_backbone.pth"
             torch.save(resnet.state_dict(), save_path)
             print("Saved model")
             while len(saved_files) > args.save_best_k - 1:
@@ -124,7 +124,9 @@ def main(args):
                 popped_state_dict.unlink()
             heappush(saved_files, (-va_loss, save_path))
 
-    print(f'Done, best validation loss: {va_loss}')
+    torch.save(resnet.state_dict(), args.ckpt_dir / f"last_backbone.pth")
+    print(
+        f'Done, best validation loss: {min(saved_files, key=lambda x: -x[0])}')
 
 
 def parse_args():
