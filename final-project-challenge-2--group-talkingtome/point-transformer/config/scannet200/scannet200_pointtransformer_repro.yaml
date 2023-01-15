@@ -1,0 +1,86 @@
+DATA:
+  data_name: scannet200
+  data_root: dataset/scannet200/
+  classes: 200
+  fea_dim: 6
+  voxel_size: 0.04
+  voxel_max: 80000
+  loop: 30
+
+
+INFERENCE:
+  test_gpu: [0]
+  batch_size_test: 4
+  model_path:
+  data_dir:
+  split_txt_dir:
+  output_dir:
+  logit_adj_post: True
+  tro: 0.25
+
+
+# TEST:
+#   test_list: dataset/scannet200/test.txt
+#   test_list_full: dataset/s3dis/list/val5_full.txt
+#   split: val  # split in [train, val and test]
+#   test_gpu: [0]
+#   test_workers: 4
+#   batch_size_test: 4
+#   model_path:
+#   save_folder:
+#   names_path: data/s3dis/s3dis_names.txt
+
+TRAIN:
+  arch: pointtransformer_seg_repro
+  criterion: ClassBalancedLoss
+  mix3d: True
+  logit_adj_train: False
+  tro_train:
+  optimizer: AdamW
+  use_xyz: True
+  sync_bn: False
+  ignore_label: -1
+  workers: 4  # data loader workers
+  batch_size: 6  # batch size for training
+  accumulation_steps: 4
+  batch_size_val: 2  # batch size for validation during training, memory and speed tradeoff
+  base_lr: 0.05
+  weight_decay: 0.01
+  lr_scheduler: CosineAnnealingLR
+  warmup_epoch: 2 # leave zero to disable warmup
+
+  # maxnorm
+  # max_norm: 1.0 # this also freezes the backbone, must also load checkpoint with args.resume
+
+  # MultiStepLR
+  lr_scheduler_milestones: [5, 10, 15, 20, 25]
+  lr_gamma: 0.5
+
+  # OneCycleLR
+  lr_pct_start: 0.1
+
+  # CosineAnnealingLR
+
+  # CosineAnnealingWarmRestarts
+  T_0: 1
+  T_mult: 20
+  eta_min: 0
+
+  epochs: 30
+  start_epoch: 0
+  momentum: 0.9
+  drop_rate: 0.5
+  manual_seed:
+  print_freq: 1
+  save_freq: 1
+  save_path:
+  weight:  # path to initial weight (default: none)
+  resume: # path to latest checkpoint (default: none)
+  evaluate: False  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
+  eval_freq: 1
+Distributed:
+  dist_url: "env://"
+  dist_backend: 'nccl'
+  multiprocessing_distributed: True
+  world_size: 1
+  rank: 0
