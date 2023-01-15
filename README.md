@@ -19,7 +19,7 @@ You can find the reports for more details.
     - mIoU: 0.7438
 - [HW2](./DLCV%20Fall%202022%20-%20hw2_intro.pdf):
   - [Report](./HW2/hw2_r11944004.pdf)
-  - Face generation with GAN ← DCGAN
+  - Face generation with GAN ← SNGAN (DCGAN with spectral normalization)
     - FID: 25.986
     - Face recognition accuracy: 0.9110
   - Digit generation with diffusion model ← Ho et al. Classifier-Free Diffusion Guidance.
