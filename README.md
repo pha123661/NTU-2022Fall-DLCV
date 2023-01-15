@@ -36,3 +36,5 @@ You can find the reports for more details.
     - SSIM: 0.9769
   - Self-Supervised pretraining for image classification ← BYOL
     - Accuracy: 0.5985
+- Final Project Challenge 2:
+  - Long-tailed 3D point cloud semantic segmentation
