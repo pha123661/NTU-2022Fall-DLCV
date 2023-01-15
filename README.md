@@ -1,6 +1,6 @@
 # NTU-2022Fall-DLCV
 
-Deep Learning for Computer Vision by Frank Wang 王鈺強
+Deep Learning for Computer Vision 深度學習於電腦視覺 by Frank Wang 王鈺強
 
 Passed strong baseline for all four assignments (Final grade: 97.22/100)
 
