@@ -4,7 +4,7 @@ Deep Learning for Computer Vision 深度學習於電腦視覺 by Frank Wang 王�
 
 Passed strong baseline for all four assignments (Final grade: 97.22/100)
 
-⭐If you find my code usefull, please consider star this project!⭐
+⭐Please consider starring this project if you find my code useful.⭐
 
 ## Outline
 
