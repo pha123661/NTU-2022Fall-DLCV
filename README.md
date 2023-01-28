@@ -2,14 +2,13 @@
 
 Deep Learning for Computer Vision 深度學習於電腦視覺 by Frank Wang 王鈺強
 
-Passed strong baseline for all four assignments (Final grade: 97.22/100)
+Surpassed strong baseline for all four assignments (Final grade: 97.22/100)
 
 ⭐Please consider starring this project if you find my code useful.⭐
 
 ## Outline
 
-Homework requirements, models I've used, and the validation score FYR.
-You can find the reports for more details.
+For more details, refer to the reports.
 
 - [HW1](./DLCV%20Fall%202022%20-%20hw1_intro.pdf): [Report](./HW1/hw1_r11944004.pdf)
   - Image classification ← Pretrained BEiT v1
@@ -38,5 +37,5 @@ You can find the reports for more details.
     - SSIM: 0.9769
   - Self-Supervised pretraining for image classification ← BYOL
     - Accuracy: 0.5985
-- [Final Project Challenge 2](DLCV%20Fall%202022%20-%20Final%20Project%20Intro.pdf): [A1 Poster](./final-project-challenge-2--group-talkingtome/poster.pdf)
+- [Final Project Challenge 2](DLCV%20Fall%202022%20-%20Final%20Project%20Intro.pdf): [Poster](./final-project-challenge-2--group-talkingtome/poster.pdf)
   - Long-tailed 3D point cloud semantic segmentation
