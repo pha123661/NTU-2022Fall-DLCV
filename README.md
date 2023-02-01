@@ -21,7 +21,7 @@ For more details, refer to the reports.
     - Face recognition accuracy: 0.9110
   - Digit generation with diffusion model ← Ho et al. Classifier-Free Diffusion Guidance.
     - Digit classifier accuracy: 0.9990
-  - Domain adcersarial network on MNIST-M, SVHN, and USPS
+  - Domain adversarial network on MNIST-M, SVHN, and USPS
     - M→S Accuracy: 0.4943
     - M→U Accuracy: 0.9025
 - [HW3](./DLCV%20Fall%202022%20-%20hw3_intro.pdf): [Report](./HW3/hw3_r11944004.pdf)
